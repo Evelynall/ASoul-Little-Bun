@@ -150,11 +150,11 @@ class DesktopPet(QWidget):
     
     def update_tray_icon(self):
         """更新托盘图标"""
-        if hasattr(self, 'tray_icon') and self.current_character:
-            # 使用当前角色的背景图片作为托盘图标
-            char_data = self.characters.get(self.current_character)
-            if char_data and char_data['bg']:
-                pixmap = QPixmap(char_data['bg'])
+        if hasattr(self, 'tray_icon'):
+            # 使用统一的托盘图标
+            icon_path = 'img/icon.png'
+            if os.path.exists(icon_path):
+                pixmap = QPixmap(icon_path)
                 # 缩放到合适的托盘图标大小
                 scaled_pixmap = pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 icon = QIcon(scaled_pixmap)
@@ -382,9 +382,6 @@ class DesktopPet(QWidget):
         
         # 应用新配置
         self.apply_settings()
-        
-        # 更新托盘图标
-        self.update_tray_icon()
     
     def start_listeners(self):
         """启动键盘和鼠标监听器"""
@@ -524,7 +521,7 @@ class DesktopPet(QWidget):
 <h2>枝江小馒头 v1.0.0</h2>
 <p><b>By：</b>Evelynal</p>
 <p><b>B站：</b><a href="https://space.bilibili.com/33374590">伊芙琳娜</a></p>
-<p><b>开源地址：</b><a href="https://github.com/Evelynall">https://github.com/Evelynall</a></p>
+<p><b>开源地址：</b><a href="https://github.com/Evelynall/ASoul-Little-Bun/">ASoul-Little-Bun</a></p>
 <br>
 <p><b>免责声明：</b></p>
 <p>此工具为粉丝自发制作的非营利性第三方工具，与A-SOUL、枝江娱乐、乐华娱乐等官方无任何关联。</p>
