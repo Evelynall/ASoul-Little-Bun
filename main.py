@@ -59,10 +59,7 @@ class ASoulLittleBun(QWidget):
         self.global_settings.save()
         
         # 重新设置窗口标志
-        flags = (
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.Tool
-        )
+        flags = Qt.WindowType.FramelessWindowHint
         
         if self.always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
@@ -239,11 +236,8 @@ class ASoulLittleBun(QWidget):
         self.close()
     
     def init_ui(self):
-        # 设置基础窗口属性
-        flags = (
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.Tool
-        )
+        # 设置基础窗口属性 - 移除Tool标志以确保OBS可以识别窗口
+        flags = Qt.WindowType.FramelessWindowHint
         
         # 根据设置决定是否置顶
         if self.always_on_top:
@@ -251,6 +245,21 @@ class ASoulLittleBun(QWidget):
             
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        # 设置窗口标题以便OBS识别
+        self.setWindowTitle("ASoul Little Bun")
+        
+        # 确保窗口在任务栏中可见（对OBS识别有帮助）
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)
+        
+        # 设置窗口图标（有助于OBS识别）
+        if hasattr(self, 'characters') and self.current_character:
+            icon_path = f"img/{self.current_character}/bgImage.png"
+            try:
+                from PyQt6.QtGui import QIcon
+                self.setWindowIcon(QIcon(icon_path))
+            except:
+                pass
         
         # 设置窗口大小
         self.resize(self.window_width, self.window_height)
@@ -518,7 +527,7 @@ class ASoulLittleBun(QWidget):
     def show_about(self):
         """显示关于对话框"""
         about_text = """
-<h2>枝江小馒头 v1.0.0</h2>
+<h2>枝江小馒头 v1.0.1</h2>
 <p><b>By：</b>Evelynal</p>
 <p><b>B站：</b><a href="https://space.bilibili.com/33374590">伊芙琳娜</a></p>
 <p><b>开源地址：</b><a href="https://github.com/Evelynall/ASoul-Little-Bun/">ASoul-Little-Bun</a></p>
