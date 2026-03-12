@@ -12,7 +12,7 @@ if errorlevel 1 (
 
 echo 清理旧的构建文件...
 if exist build rmdir /s /q build
-if exist dist\DesktopPet.exe del /q dist\DesktopPet.exe
+if exist dist\ASoul_Little_Bun.exe del /q dist\ASoul_Little_Bun.exe
 
 echo.
 echo 开始打包...
@@ -36,7 +36,7 @@ if exist global_config.json copy /Y global_config.json dist\
 echo.
 echo ========================================
 echo 打包完成！
-echo 可执行文件位置: dist\DesktopPet.exe
+echo 可执行文件位置: dist\ASoul_Little_Bun.exe
 echo 资源文件已复制到: dist\img\
 echo ========================================
 echo.

@@ -7,7 +7,7 @@ from pynput import keyboard, mouse
 from settings import Settings, GlobalSettings, SettingsDialog
 
 
-class DesktopPet(QWidget):
+class ASoulLittleBun(QWidget):
     def __init__(self):
         super().__init__()
         # 加载全局设置
@@ -662,5 +662,5 @@ class DesktopPet(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    pet = DesktopPet()
+    pet = ASoulLittleBun()
     sys.exit(app.exec())
