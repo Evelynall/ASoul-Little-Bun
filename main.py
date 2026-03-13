@@ -19,8 +19,17 @@ class ASoulLittleBun(QWidget):
         self.hide_taskbar = self.global_settings.get('hide_taskbar', False)
         
         self.characters = self.load_characters()
-        self.current_character_index = 0
-        self.current_character = list(self.characters.keys())[0] if self.characters else None
+        
+        # 加载上次使用的角色
+        last_character = self.global_settings.get('last_character')
+        if last_character and last_character in self.characters:
+            self.current_character = last_character
+            character_list = list(self.characters.keys())
+            self.current_character_index = character_list.index(last_character)
+        else:
+            # 如果没有保存的角色或角色不存在，使用第一个角色
+            self.current_character_index = 0
+            self.current_character = list(self.characters.keys())[0] if self.characters else None
         
         # 加载当前角色的配置
         self.load_character_settings()
@@ -424,6 +433,10 @@ class ASoulLittleBun(QWidget):
         self.current_character = character_name
         character_list = list(self.characters.keys())
         self.current_character_index = character_list.index(character_name)
+        
+        # 保存当前角色到全局配置
+        self.global_settings.set('last_character', character_name)
+        self.global_settings.save()
         
         # 加载新角色的配置
         self.load_character_settings()
