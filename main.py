@@ -13,9 +13,10 @@ class ASoulLittleBun(QWidget):
         # 加载全局设置
         self.global_settings = GlobalSettings()
         
-        # 窗口状态设置（默认置顶、不穿透）
+        # 窗口状态设置（默认置顶、不穿透、不隐藏任务栏）
         self.always_on_top = self.global_settings.get('always_on_top', True)
         self.mouse_passthrough = self.global_settings.get('mouse_passthrough', False)
+        self.hide_taskbar = self.global_settings.get('hide_taskbar', False)
         
         self.characters = self.load_characters()
         self.current_character_index = 0
@@ -78,6 +79,33 @@ class ASoulLittleBun(QWidget):
         
         # 应用鼠标穿透设置
         self.apply_mouse_passthrough()
+        
+        # 更新托盘菜单以同步勾选状态
+        self.create_tray_menu()
+    
+    def toggle_hide_taskbar(self):
+        """切换隐藏任务栏状态"""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        # 如果要开启隐藏任务栏，先显示警告
+        if not self.hide_taskbar:
+            reply = QMessageBox.question(
+                self, 
+                '隐藏任务栏确认',
+                '启用隐藏任务栏功能后，OBS将无法识别此窗口。\n\n是否继续？',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        
+        self.hide_taskbar = not self.hide_taskbar
+        self.global_settings.set('hide_taskbar', self.hide_taskbar)
+        self.global_settings.save()
+        
+        # 应用隐藏任务栏设置
+        self.apply_hide_taskbar()
         
         # 更新托盘菜单以同步勾选状态
         self.create_tray_menu()
@@ -186,6 +214,13 @@ class ASoulLittleBun(QWidget):
         mouse_passthrough_action.triggered.connect(self.toggle_mouse_passthrough)
         tray_menu.addAction(mouse_passthrough_action)
         
+        # 隐藏任务栏开关
+        hide_taskbar_action = QAction('隐藏任务栏 (OBS不可识别)', self)
+        hide_taskbar_action.setCheckable(True)
+        hide_taskbar_action.setChecked(self.hide_taskbar)
+        hide_taskbar_action.triggered.connect(self.toggle_hide_taskbar)
+        tray_menu.addAction(hide_taskbar_action)
+        
         tray_menu.addSeparator()
         
         # 切换角色菜单
@@ -236,7 +271,7 @@ class ASoulLittleBun(QWidget):
         self.close()
     
     def init_ui(self):
-        # 设置基础窗口属性 - 移除Tool标志以确保OBS可以识别窗口
+        # 设置基础窗口属性 - 保持OBS兼容性
         flags = Qt.WindowType.FramelessWindowHint
         
         # 根据设置决定是否置顶
@@ -297,6 +332,10 @@ class ASoulLittleBun(QWidget):
         self.drag_position = QPoint()
         
         self.show()
+        
+        # 根据设置决定是否隐藏任务栏
+        if self.hide_taskbar:
+            self.hide_from_taskbar()
     
     def load_characters(self):
         """自动识别img目录下的角色文件夹"""
@@ -608,6 +647,13 @@ class ASoulLittleBun(QWidget):
         mouse_passthrough_action.triggered.connect(self.toggle_mouse_passthrough)
         menu.addAction(mouse_passthrough_action)
         
+        # 隐藏任务栏开关
+        hide_taskbar_action = QAction('隐藏任务栏 (OBS不可识别)', self)
+        hide_taskbar_action.setCheckable(True)
+        hide_taskbar_action.setChecked(self.hide_taskbar)
+        hide_taskbar_action.triggered.connect(self.toggle_hide_taskbar)
+        menu.addAction(hide_taskbar_action)
+        
         menu.addSeparator()
         
         # 切换角色二级菜单
@@ -633,6 +679,77 @@ class ASoulLittleBun(QWidget):
         menu.addAction(exit_action)
         
         menu.exec(event.globalPos())
+    
+    def hide_from_taskbar(self):
+        """Windows特定方法：隐藏任务栏图标但保持窗口可被OBS识别"""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # 获取窗口句柄
+            hwnd = int(self.winId())
+            
+            # Windows API常量
+            GWL_EXSTYLE = -20
+            WS_EX_TOOLWINDOW = 0x00000080
+            WS_EX_APPWINDOW = 0x00040000
+            
+            # 获取当前扩展样式
+            ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            
+            # 添加WS_EX_TOOLWINDOW并移除WS_EX_APPWINDOW来隐藏任务栏图标
+            ex_style |= WS_EX_TOOLWINDOW
+            ex_style &= ~WS_EX_APPWINDOW
+            
+            # 应用新的扩展样式
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
+            
+            # 强制更新窗口显示
+            ctypes.windll.user32.ShowWindow(hwnd, 5)  # SW_SHOW
+            
+        except Exception as e:
+            print(f"隐藏任务栏图标失败: {e}")
+            # 如果Windows API调用失败，回退到Qt方法
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+    
+    def show_in_taskbar(self):
+        """Windows特定方法：显示任务栏图标以便OBS识别"""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # 获取窗口句柄
+            hwnd = int(self.winId())
+            
+            # Windows API常量
+            GWL_EXSTYLE = -20
+            WS_EX_TOOLWINDOW = 0x00000080
+            WS_EX_APPWINDOW = 0x00040000
+            
+            # 获取当前扩展样式
+            ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            
+            # 移除WS_EX_TOOLWINDOW并添加WS_EX_APPWINDOW来显示任务栏图标
+            ex_style &= ~WS_EX_TOOLWINDOW
+            ex_style |= WS_EX_APPWINDOW
+            
+            # 应用新的扩展样式
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
+            
+            # 强制更新窗口显示
+            ctypes.windll.user32.ShowWindow(hwnd, 5)  # SW_SHOW
+            
+        except Exception as e:
+            print(f"显示任务栏图标失败: {e}")
+            # 如果Windows API调用失败，回退到Qt方法
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)
+    
+    def apply_hide_taskbar(self):
+        """应用隐藏任务栏设置"""
+        if self.hide_taskbar:
+            self.hide_from_taskbar()
+        else:
+            self.show_in_taskbar()
     
     def closeEvent(self, event):
         """关闭事件 - 停止监听器和定时器"""
@@ -667,6 +784,38 @@ class ASoulLittleBun(QWidget):
         
         # 强制退出应用
         QApplication.quit()
+
+    def hide_from_taskbar(self):
+        """Windows特定方法：隐藏任务栏图标但保持窗口可被OBS识别"""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            # 获取窗口句柄
+            hwnd = int(self.winId())
+
+            # Windows API常量
+            GWL_EXSTYLE = -20
+            WS_EX_TOOLWINDOW = 0x00000080
+            WS_EX_APPWINDOW = 0x00040000
+
+            # 获取当前扩展样式
+            ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+
+            # 添加WS_EX_TOOLWINDOW并移除WS_EX_APPWINDOW来隐藏任务栏图标
+            ex_style |= WS_EX_TOOLWINDOW
+            ex_style &= ~WS_EX_APPWINDOW
+
+            # 应用新的扩展样式
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
+
+            # 强制更新窗口显示
+            ctypes.windll.user32.ShowWindow(hwnd, 5)  # SW_SHOW
+
+        except Exception as e:
+            print(f"隐藏任务栏图标失败: {e}")
+            # 如果Windows API调用失败，回退到Qt方法
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
 
 if __name__ == '__main__':
