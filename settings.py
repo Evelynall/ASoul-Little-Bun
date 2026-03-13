@@ -63,6 +63,7 @@ class Settings:
         'keyboard_width': 25,
         'keyboard_height': 25,
         'keyboard_press_offset': 5,
+        'keyboard_horizontal_travel': 40,
         'mouse_x': 190,
         'mouse_y': 90,
         'mouse_width': 25,
