@@ -6,6 +6,7 @@ from PyQt6.QtGui import QPixmap, QPainter, QCursor, QAction, QIcon, QSurfaceForm
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from pynput import keyboard, mouse
 from settings import Settings, GlobalSettings, SettingsDialog
+from update_checker import UpdateChecker
 
 
 class ASoulLittleBun(QOpenGLWidget):
@@ -424,6 +425,9 @@ class ASoulLittleBun(QOpenGLWidget):
         
         # 显示首次启动提示（只显示一次）
         self.show_first_launch_tip()
+        
+        # 检查更新（在窗口显示后）
+        QTimer.singleShot(1000, self.check_for_updates)
     
     def paintEvent(self, event):
         """重写 paintEvent 以支持 OpenGL 渲染和透明背景"""
@@ -698,7 +702,7 @@ class ASoulLittleBun(QOpenGLWidget):
     def show_about(self):
         """显示关于对话框"""
         about_text = """
-<h2>枝江小馒头 v1.0.4</h2>
+<h2>枝江小馒头 v1.1.0</h2>
 <p><b>By：</b>Evelynal</p>
 <p><b>B站：</b><a href="https://space.bilibili.com/33374590">伊芙琳娜</a></p>
 <p><b>开源地址：</b><a href="https://github.com/Evelynall/ASoul-Little-Bun/">ASoul-Little-Bun</a></p>
@@ -924,6 +928,17 @@ class ASoulLittleBun(QOpenGLWidget):
             # 标记为已显示
             self.global_settings.set('first_launch_tip_shown', True)
             self.global_settings.save()
+    
+    def check_for_updates(self):
+        """检查更新"""
+        try:
+            checker = UpdateChecker()
+            # 启动时自动清理本地更新日志文件夹
+            checker.clean_local_changelogs()
+            # 检查更新，传递 global_settings 以支持跳过版本功能
+            checker.check_for_updates(self, self.global_settings)
+        except Exception as e:
+            print(f"检查更新失败: {e}")
     
     def closeEvent(self, event):
         """关闭事件 - 停止监听器和定时器"""
