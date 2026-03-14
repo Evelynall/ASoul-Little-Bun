@@ -65,6 +65,7 @@ class ASoulLittleBun(QOpenGLWidget):
         self.mouse_passthrough = self.global_settings.get('mouse_passthrough', False)
         self.hide_taskbar = self.global_settings.get('hide_taskbar', True)
         self.mouse_locked = self.global_settings.get('mouse_locked', False)
+        self.keyboard_horizontal_offset = self.global_settings.get('keyboard_horizontal_offset', True)
         
         self.characters = self.load_characters()
         
@@ -202,6 +203,15 @@ class ASoulLittleBun(QOpenGLWidget):
             # 解锁时也重置速度，避免突然的移动
             self.mouse_velocity_x = 0
             self.mouse_velocity_y = 0
+        
+        # 更新托盘菜单以同步勾选状态
+        self.create_tray_menu()
+    
+    def toggle_keyboard_horizontal_offset(self):
+        """切换键盘横向偏移状态"""
+        self.keyboard_horizontal_offset = not self.keyboard_horizontal_offset
+        self.global_settings.set('keyboard_horizontal_offset', self.keyboard_horizontal_offset)
+        self.global_settings.save()
         
         # 更新托盘菜单以同步勾选状态
         self.create_tray_menu()
@@ -351,6 +361,13 @@ class ASoulLittleBun(QOpenGLWidget):
         mouse_locked_action.setChecked(self.mouse_locked)
         mouse_locked_action.triggered.connect(self.toggle_mouse_locked)
         tray_menu.addAction(mouse_locked_action)
+        
+        # 键盘横向偏移开关
+        keyboard_horizontal_offset_action = QAction('键盘横向偏移', self)
+        keyboard_horizontal_offset_action.setCheckable(True)
+        keyboard_horizontal_offset_action.setChecked(self.keyboard_horizontal_offset)
+        keyboard_horizontal_offset_action.triggered.connect(self.toggle_keyboard_horizontal_offset)
+        tray_menu.addAction(keyboard_horizontal_offset_action)
         
         tray_menu.addSeparator()
         
@@ -644,6 +661,10 @@ class ASoulLittleBun(QOpenGLWidget):
         base_x = self.settings.get('keyboard_x')
         current_target_x = self.keyboard_target_x if self.keyboard_target_x is not None else base_x
 
+        # 如果键盘横向偏移功能关闭，直接返回基础位置
+        if not self.keyboard_horizontal_offset:
+            return base_x
+
         if not key_identifier:
             return current_target_x
 
@@ -786,7 +807,7 @@ class ASoulLittleBun(QOpenGLWidget):
     def show_about(self):
         """显示关于对话框"""
         about_text = """
-<h2>枝江小馒头 v1.1.0</h2>
+<h2>枝江小馒头 v1.1.1</h2>
 <p><b>By：</b>Evelynal</p>
 <p><b>B站：</b><a href="https://space.bilibili.com/33374590">伊芙琳娜</a></p>
 <p><b>开源地址：</b><a href="https://github.com/Evelynall/ASoul-Little-Bun/">ASoul-Little-Bun</a></p>
@@ -884,6 +905,13 @@ class ASoulLittleBun(QOpenGLWidget):
         mouse_locked_action.setChecked(self.mouse_locked)
         mouse_locked_action.triggered.connect(self.toggle_mouse_locked)
         menu.addAction(mouse_locked_action)
+        
+        # 键盘横向偏移开关
+        keyboard_horizontal_offset_action = QAction('键盘横向偏移', self)
+        keyboard_horizontal_offset_action.setCheckable(True)
+        keyboard_horizontal_offset_action.setChecked(self.keyboard_horizontal_offset)
+        keyboard_horizontal_offset_action.triggered.connect(self.toggle_keyboard_horizontal_offset)
+        menu.addAction(keyboard_horizontal_offset_action)
         
         menu.addSeparator()
         
