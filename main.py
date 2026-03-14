@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QMenu, QDialog, QSystemTrayIcon, QMessageBox
 from PyQt6.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QCursor, QAction, QIcon, QSurfaceFormat
@@ -501,6 +502,16 @@ class ASoulLittleBun(QOpenGLWidget):
         painter.fillRect(self.rect(), Qt.GlobalColor.transparent)
         painter.end()
     
+    def get_version(self):
+        """从version.json文件读取版本号"""
+        try:
+            with open('version.json', 'r', encoding='utf-8') as f:
+                version_data = json.load(f)
+                return version_data.get('version', '1.0.0')
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            # 如果文件不存在或格式错误，返回默认版本号
+            return '1.0.0'
+    
     def load_characters(self):
         """自动识别img目录下的角色文件夹"""
         characters = {}
@@ -806,8 +817,9 @@ class ASoulLittleBun(QOpenGLWidget):
     
     def show_about(self):
         """显示关于对话框"""
-        about_text = """
-<h2>枝江小馒头 v1.1.1</h2>
+        version = self.get_version()
+        about_text = f"""
+<h2>枝江小馒头 v{version}</h2>
 <p><b>By：</b>Evelynal</p>
 <p><b>B站：</b><a href="https://space.bilibili.com/33374590">伊芙琳娜</a></p>
 <p><b>开源地址：</b><a href="https://github.com/Evelynall/ASoul-Little-Bun/">ASoul-Little-Bun</a></p>
