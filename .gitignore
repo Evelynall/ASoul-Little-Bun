@@ -119,8 +119,6 @@ Thumbs.db
 config.json
 global_config.json
 
-# Update changelogs (fetched from remote)
-changelogs/
 
 # Version control - DO NOT IGNORE
 # version.json should be tracked
