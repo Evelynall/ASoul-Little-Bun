@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
+    ['updater.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -27,18 +27,17 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='ASoul-Little-Bun',
+    name='updater',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='img/icon.png',
 )

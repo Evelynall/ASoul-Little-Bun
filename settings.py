@@ -110,9 +110,9 @@ class Settings:
         'mouse_sensitivity': 0.3,
         'sync_scale_enabled': False,
         'keypress_display_enabled': True,
-        'keypress_display_x': 32,
-        'keypress_display_y': 46,
-        'keypress_display_font_size': 30
+        'keypress_display_x': 8,
+        'keypress_display_y': 53,
+        'keypress_display_font_size': 20
     }
     
     def __init__(self, character_name, character_folder):

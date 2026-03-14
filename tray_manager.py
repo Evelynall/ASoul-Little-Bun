@@ -80,12 +80,20 @@ class TrayManager:
         keyboard_horizontal_offset_action.triggered.connect(self.parent.toggle_keyboard_horizontal_offset)
         tray_menu.addAction(keyboard_horizontal_offset_action)
         
-        # 按键显示开关
-        keypress_display_action = QAction('按键显示', self.parent)
+        # 按键显示二级菜单
+        keypress_menu = tray_menu.addMenu('按键显示')
+        
+        keypress_display_action = QAction('启用按键显示', self.parent)
         keypress_display_action.setCheckable(True)
         keypress_display_action.setChecked(self.parent.keypress_display_enabled)
         keypress_display_action.triggered.connect(self.parent.toggle_keypress_display)
-        tray_menu.addAction(keypress_display_action)
+        keypress_menu.addAction(keypress_display_action)
+        
+        keypress_background_action = QAction('显示按键背景', self.parent)
+        keypress_background_action.setCheckable(True)
+        keypress_background_action.setChecked(self.parent.keypress_display_background)
+        keypress_background_action.triggered.connect(self.parent.toggle_keypress_display_background)
+        keypress_menu.addAction(keypress_background_action)
         
         tray_menu.addSeparator()
         

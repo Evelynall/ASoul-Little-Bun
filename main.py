@@ -34,6 +34,7 @@ class ASoulLittleBun(QOpenGLWidget):
         self.mouse_locked = self.window_manager.mouse_locked
         self.keyboard_horizontal_offset = self.window_manager.keyboard_horizontal_offset
         self.keypress_display_enabled = self.window_manager.keypress_display_enabled
+        self.keypress_display_background = self.window_manager.keypress_display_background
         
         # 初始化角色管理器
         self.character_manager = CharacterManager()
@@ -106,14 +107,7 @@ class ASoulLittleBun(QOpenGLWidget):
         
         # 创建按键显示标签
         self.keypress_display_label = QLabel(self)
-        self.keypress_display_label.setStyleSheet(
-            f"color: white; "
-            f"background-color: rgba(0, 0, 0, 150); "
-            f"padding: 5px; "
-            f"border-radius: 5px; "
-            f"font-size: {self.settings.get('keypress_display_font_size', 16)}px; "
-            f"font-weight: bold;"
-        )
+        self._update_keypress_display_style()
         self.keypress_display_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.keypress_display_label.hide()
         self.keypress_display_label.setGeometry(
@@ -229,7 +223,13 @@ class ASoulLittleBun(QOpenGLWidget):
         display_text = self._format_key_display(key_identifier)
         
         self.keypress_display_label.setText(display_text)
+        
+        # 设置最小宽度以确保居中效果
+        min_width = 80
         self.keypress_display_label.adjustSize()
+        if self.keypress_display_label.width() < min_width:
+            self.keypress_display_label.setFixedWidth(min_width)
+        
         self.keypress_display_label.show()
         
         # 重启定时器，1秒后隐藏
@@ -238,6 +238,26 @@ class ASoulLittleBun(QOpenGLWidget):
     def _hide_keypress_display(self):
         """隐藏按键显示"""
         self.keypress_display_label.hide()
+    
+    def _update_keypress_display_style(self):
+        """更新按键显示样式"""
+        if self.keypress_display_background:
+            style = (
+                f"color: white; "
+                f"background-color: rgba(0, 0, 0, 150); "
+                f"padding: 5px; "
+                f"border-radius: 5px; "
+                f"font-size: {self.settings.get('keypress_display_font_size', 16)}px; "
+                f"font-weight: bold;"
+            )
+        else:
+            style = (
+                f"color: white; "
+                f"padding: 5px; "
+                f"font-size: {self.settings.get('keypress_display_font_size', 16)}px; "
+                f"font-weight: bold;"
+            )
+        self.keypress_display_label.setStyleSheet(style)
     
     def _format_key_display(self, key_identifier):
         """格式化按键显示文本"""
@@ -358,6 +378,15 @@ class ASoulLittleBun(QOpenGLWidget):
         if not self.keypress_display_enabled:
             self.keypress_display_label.hide()
         
+        self.tray_manager.create_tray_menu()
+    
+    def toggle_keypress_display_background(self):
+        """切换按键背景显示"""
+        self.window_manager.toggle_keypress_display_background()
+        self.keypress_display_background = self.window_manager.keypress_display_background
+        self._update_keypress_display_style()
+        
+        # 更新托盘菜单
         self.tray_manager.create_tray_menu()
     
     def toggle_window_visibility(self):
@@ -539,11 +568,20 @@ class ASoulLittleBun(QOpenGLWidget):
         keyboard_horizontal_offset_action.triggered.connect(self.toggle_keyboard_horizontal_offset)
         parent_menu.addAction(keyboard_horizontal_offset_action)
         
-        keypress_display_action = QAction('按键显示', self)
+        # 按键显示二级菜单
+        keypress_menu = parent_menu.addMenu('按键显示')
+        
+        keypress_display_action = QAction('启用按键显示', self)
         keypress_display_action.setCheckable(True)
         keypress_display_action.setChecked(self.keypress_display_enabled)
         keypress_display_action.triggered.connect(self.toggle_keypress_display)
-        parent_menu.addAction(keypress_display_action)
+        keypress_menu.addAction(keypress_display_action)
+        
+        keypress_background_action = QAction('显示按键背景', self)
+        keypress_background_action.setCheckable(True)
+        keypress_background_action.setChecked(self.keypress_display_background)
+        keypress_background_action.triggered.connect(self.toggle_keypress_display_background)
+        keypress_menu.addAction(keypress_background_action)
     
     def _add_character_menu(self, parent_menu):
         """添加角色切换子菜单"""

@@ -10,38 +10,115 @@
    （脚本会自动安装 PyInstaller 如果未安装）
 
 3. 打包完成后，在 dist 文件夹中会生成：
-   - DesktopPet.exe （主程序，使用 img/icon.png 作为应用图标）
-   - img\ （角色资源文件夹，包含 icon.png 托盘图标）
+   - ASoul-Little-Bun.exe （主程序，约15-25MB）
+   - updater.exe （更新程序，约10-15MB）
+   - img\ （角色资源文件夹，外部文件）
+   - version.json （版本信息，外部文件）
+   - changelogs\ （更新日志文件夹）
    - global_config.json （全局配置，如果存在）
 
 二、分发说明：
 
-将 dist 文件夹重命名为 "桌面宠物" 或其他名称，整个文件夹可以直接分发。
+必须分发整个dist文件夹，包含：
+- ASoul-Little-Bun.exe
+- updater.exe
+- img文件夹（必需）
+- version.json（必需）
+- changelogs文件夹（可选）
 
 文件夹结构：
-桌面宠物/
-├── DesktopPet.exe
-├── img/
-│   ├── icon.png （应用和托盘图标）
+ASoul-Little-Bun/
+├── ASoul-Little-Bun.exe （主程序，15-25MB）
+├── updater.exe （更新程序，10-15MB）
+├── img/ （资源文件夹，必需）
+│   ├── icon.png
 │   ├── 乃琳/
 │   ├── 嘉然/
 │   ├── 思诺/
-│   └── 贝拉/
+│   ├── 贝拉/
 │   └── 心宜/
-└── global_config.json （可选）
+├── version.json （版本信息，必需）
+├── changelogs/ （更新日志，可选）
+│   ├── v1.0.0.md
+│   ├── v1.2.0.md
+│   └── ...
+└── global_config.json （运行时自动生成）
 
 三、使用说明：
 
-用户只需双击 DesktopPet.exe 即可运行。
-- img 文件夹必须与 exe 在同一目录
-- 配置文件会自动在角色文件夹中生成
-- 可以添加新角色到 img 文件夹
-- 应用图标和托盘图标统一使用 img/icon.png
+用户需要：
+1. 解压整个文件夹
+2. 保持文件结构不变
+3. 双击 ASoul-Little-Bun.exe 运行
 
-四、优化说明：
+注意事项：
+- img文件夹必须与exe在同一目录
+- version.json必须与exe在同一目录
+- 不要单独分发exe文件
 
-- 使用 UPX 压缩减小体积
-- 不打包成单文件，启动更快
-- 资源文件外置，方便用户自定义
-- 无控制台窗口，界面更简洁
-- 统一的应用图标和托盘图标设计
+四、自动更新说明：
+
+- updater.exe是独立程序，无需Python
+- 更新时会替换exe和资源文件
+- version.json用于版本检查
+- 完全自动化的更新体验
+
+五、优化说明：
+
+- 使用 onefile 模式，exe文件小
+- 资源文件外置，方便更新和自定义
+- 无控制台窗口，界面简洁
+- updater.exe独立打包，无需Python
+- 完整的自动更新支持
+
+六、文件大小：
+
+- ASoul-Little-Bun.exe: 15-25MB
+- updater.exe: 10-15MB
+- img文件夹: 5-10MB
+- 总大小: 30-50MB
+- 压缩后: 15-25MB
+
+
+五、自动更新功能说明：
+
+1. 必须包含的文件：
+   - updater.py （更新程序脚本）
+   - version.json （版本信息和下载链接）
+   - update_checker.py （已包含在主程序中）
+
+2. 打包时注意：
+   - updater.py 必须作为独立文件存在（不能打包进exe）
+   - version.json 必须可读写
+   - 确保程序有写入权限
+
+3. 发布新版本时：
+   - 更新 version.json 中的版本号和下载链接
+   - 在 changelogs 文件夹添加对应版本的更新日志
+   - 将整个程序文件夹打包成 zip 上传到 GitHub Release
+   - 下载链接格式：https://github.com/用户名/仓库名/releases/latest/download/文件名.zip
+
+4. 文件夹结构（包含更新功能）：
+桌面宠物/
+├── DesktopPet.exe
+├── updater.py （更新程序）
+├── version.json （版本信息）
+├── img/
+│   └── ...
+├── changelogs/ （更新日志）
+│   ├── v1.0.0.md
+│   ├── v1.2.0.md
+│   └── ...
+└── global_config.json （可选）
+
+5. 用户更新流程：
+   - 程序启动时自动检查更新
+   - 发现新版本时显示更新对话框
+   - 用户点击"自动下载更新"
+   - 程序自动下载、解压、替换文件
+   - 自动重启完成更新
+
+6. 备份机制：
+   - 更新前自动备份到 backup_before_update 文件夹
+   - 不会覆盖用户配置文件（global_config.json等）
+   - 更新失败可从备份恢复

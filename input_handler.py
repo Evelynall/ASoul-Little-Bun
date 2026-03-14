@@ -19,7 +19,7 @@ class InputHandler:
     }
     
     SPECIAL_KEYBOARD_UNITS = {
-        'esc': -1.5, 'tab': -1.0, 'caps_lock': -1.0, 'shift': 8.5,
+        'esc': -1.5, 'tab': -1.0, 'caps_lock': -1.0, 'shift': -1.5,
         'shift_l': -1.5, 'shift_r': 8.5, 'ctrl': -1.5, 'ctrl_l': -1.5,
         'ctrl_r': 7.5, 'alt': 2.5, 'alt_l': 2.5, 'alt_r': 6.5,
         'alt_gr': 6.5, 'cmd': 1.5, 'cmd_l': 1.5, 'cmd_r': 7.0,

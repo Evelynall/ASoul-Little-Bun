@@ -16,6 +16,7 @@ class WindowManager:
         self.mouse_locked = global_settings.get('mouse_locked', False)
         self.keyboard_horizontal_offset = global_settings.get('keyboard_horizontal_offset', True)
         self.keypress_display_enabled = global_settings.get('keypress_display_enabled', True)
+        self.keypress_display_background = global_settings.get('keypress_display_background', False)
     
     def toggle_always_on_top(self):
         """切换窗口置顶状态"""
@@ -81,6 +82,12 @@ class WindowManager:
         """切换按键显示状态"""
         self.keypress_display_enabled = not self.keypress_display_enabled
         self.global_settings.set('keypress_display_enabled', self.keypress_display_enabled)
+        self.global_settings.save()
+    
+    def toggle_keypress_display_background(self):
+        """切换按键背景显示状态"""
+        self.keypress_display_background = not self.keypress_display_background
+        self.global_settings.set('keypress_display_background', self.keypress_display_background)
         self.global_settings.save()
     
     def apply_mouse_passthrough(self):
