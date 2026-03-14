@@ -23,7 +23,8 @@ MANIFEST
 
 # PyInstaller
 *.manifest
-*.spec
+# build.spec should be tracked
+# *.spec
 
 # Installer logs
 pip-log.txt

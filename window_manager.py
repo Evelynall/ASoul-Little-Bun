@@ -15,6 +15,7 @@ class WindowManager:
         self.hide_taskbar = global_settings.get('hide_taskbar', True)
         self.mouse_locked = global_settings.get('mouse_locked', False)
         self.keyboard_horizontal_offset = global_settings.get('keyboard_horizontal_offset', True)
+        self.keypress_display_enabled = global_settings.get('keypress_display_enabled', True)
     
     def toggle_always_on_top(self):
         """切换窗口置顶状态"""
@@ -74,6 +75,12 @@ class WindowManager:
         """切换键盘横向偏移状态"""
         self.keyboard_horizontal_offset = not self.keyboard_horizontal_offset
         self.global_settings.set('keyboard_horizontal_offset', self.keyboard_horizontal_offset)
+        self.global_settings.save()
+    
+    def toggle_keypress_display(self):
+        """切换按键显示状态"""
+        self.keypress_display_enabled = not self.keypress_display_enabled
+        self.global_settings.set('keypress_display_enabled', self.keypress_display_enabled)
         self.global_settings.save()
     
     def apply_mouse_passthrough(self):

@@ -108,7 +108,11 @@ class Settings:
         'mouse_height': 25,
         'max_mouse_offset': 20,
         'mouse_sensitivity': 0.3,
-        'sync_scale_enabled': False
+        'sync_scale_enabled': False,
+        'keypress_display_enabled': True,
+        'keypress_display_x': 32,
+        'keypress_display_y': 46,
+        'keypress_display_font_size': 30
     }
     
     def __init__(self, character_name, character_folder):
@@ -569,6 +573,63 @@ class SettingsDialog(QDialog):
         mouse_group.setLayout(mouse_layout)
         layout.addWidget(mouse_group)
         
+        # 按键显示设置
+        keypress_group = QGroupBox('按键显示')
+        keypress_layout = QFormLayout()
+        
+        # 启用按键显示
+        self.keypress_enabled_checkbox = QCheckBox('启用按键显示')
+        self.keypress_enabled_checkbox.setChecked(self.settings.get('keypress_display_enabled', True))
+        keypress_layout.addRow('', self.keypress_enabled_checkbox)
+        
+        # 按键显示 X 偏移
+        keypress_x_layout = QHBoxLayout()
+        self.keypress_x_slider = QSlider(Qt.Orientation.Horizontal)
+        self.keypress_x_slider.setRange(0, self.screen_width)
+        self.keypress_x_slider.setValue(self.settings.get('keypress_display_x', 10))
+        self.keypress_x_spin = QSpinBox()
+        self.keypress_x_spin.setRange(0, self.screen_width)
+        self.keypress_x_spin.setValue(self.settings.get('keypress_display_x', 10))
+        self.keypress_x_spin.setSuffix(' px')
+        self.keypress_x_slider.valueChanged.connect(self.keypress_x_spin.setValue)
+        self.keypress_x_spin.valueChanged.connect(self.keypress_x_slider.setValue)
+        keypress_x_layout.addWidget(self.keypress_x_slider)
+        keypress_x_layout.addWidget(self.keypress_x_spin)
+        keypress_layout.addRow('X 偏移:', keypress_x_layout)
+        
+        # 按键显示 Y 偏移
+        keypress_y_layout = QHBoxLayout()
+        self.keypress_y_slider = QSlider(Qt.Orientation.Horizontal)
+        self.keypress_y_slider.setRange(0, self.screen_height)
+        self.keypress_y_slider.setValue(self.settings.get('keypress_display_y', 10))
+        self.keypress_y_spin = QSpinBox()
+        self.keypress_y_spin.setRange(0, self.screen_height)
+        self.keypress_y_spin.setValue(self.settings.get('keypress_display_y', 10))
+        self.keypress_y_spin.setSuffix(' px')
+        self.keypress_y_slider.valueChanged.connect(self.keypress_y_spin.setValue)
+        self.keypress_y_spin.valueChanged.connect(self.keypress_y_slider.setValue)
+        keypress_y_layout.addWidget(self.keypress_y_slider)
+        keypress_y_layout.addWidget(self.keypress_y_spin)
+        keypress_layout.addRow('Y 偏移:', keypress_y_layout)
+        
+        # 字体大小
+        font_size_layout = QHBoxLayout()
+        self.font_size_slider = QSlider(Qt.Orientation.Horizontal)
+        self.font_size_slider.setRange(8, 48)
+        self.font_size_slider.setValue(self.settings.get('keypress_display_font_size', 16))
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setRange(8, 48)
+        self.font_size_spin.setValue(self.settings.get('keypress_display_font_size', 16))
+        self.font_size_spin.setSuffix(' px')
+        self.font_size_slider.valueChanged.connect(self.font_size_spin.setValue)
+        self.font_size_spin.valueChanged.connect(self.font_size_slider.setValue)
+        font_size_layout.addWidget(self.font_size_slider)
+        font_size_layout.addWidget(self.font_size_spin)
+        keypress_layout.addRow('字体大小:', font_size_layout)
+        
+        keypress_group.setLayout(keypress_layout)
+        layout.addWidget(keypress_group)
+        
         # 设置滚动区域
         scroll.setWidget(content_widget)
         
@@ -600,6 +661,12 @@ class SettingsDialog(QDialog):
         self.mouse_height_spin.valueChanged.connect(self.apply_preview)
         self.max_offset_spin.valueChanged.connect(self.apply_preview)
         self.sensitivity_spin.valueChanged.connect(self.apply_preview)
+        
+        # 按键显示
+        self.keypress_enabled_checkbox.stateChanged.connect(self.apply_preview)
+        self.keypress_x_spin.valueChanged.connect(self.apply_preview)
+        self.keypress_y_spin.valueChanged.connect(self.apply_preview)
+        self.font_size_spin.valueChanged.connect(self.apply_preview)
     
     
     def show_startup_guide(self):
@@ -880,7 +947,11 @@ class SettingsDialog(QDialog):
             'mouse_width': self.mouse_width_spin.value(),
             'mouse_height': self.mouse_height_spin.value(),
             'max_mouse_offset': self.max_offset_spin.value(),
-            'mouse_sensitivity': self.sensitivity_spin.value() / 100.0
+            'mouse_sensitivity': self.sensitivity_spin.value() / 100.0,
+            'keypress_display_enabled': self.keypress_enabled_checkbox.isChecked(),
+            'keypress_display_x': self.keypress_x_spin.value(),
+            'keypress_display_y': self.keypress_y_spin.value(),
+            'keypress_display_font_size': self.font_size_spin.value()
         }
         
         # 临时保存原始设置
@@ -913,6 +984,10 @@ class SettingsDialog(QDialog):
         self.max_offset_spin.setValue(Settings.DEFAULT_SETTINGS['max_mouse_offset'])
         self.sensitivity_spin.setValue(int(Settings.DEFAULT_SETTINGS['mouse_sensitivity'] * 100))
         self.sync_scale_checkbox.setChecked(Settings.DEFAULT_SETTINGS['sync_scale_enabled'])
+        self.keypress_enabled_checkbox.setChecked(Settings.DEFAULT_SETTINGS['keypress_display_enabled'])
+        self.keypress_x_spin.setValue(Settings.DEFAULT_SETTINGS['keypress_display_x'])
+        self.keypress_y_spin.setValue(Settings.DEFAULT_SETTINGS['keypress_display_y'])
+        self.font_size_spin.setValue(Settings.DEFAULT_SETTINGS['keypress_display_font_size'])
         # 重置后立即应用预览
         self.apply_preview()
     
@@ -943,6 +1018,10 @@ class SettingsDialog(QDialog):
         self.settings.set('max_mouse_offset', self.max_offset_spin.value())
         self.settings.set('mouse_sensitivity', self.sensitivity_spin.value() / 100.0)
         self.settings.set('sync_scale_enabled', self.sync_scale_checkbox.isChecked())
+        self.settings.set('keypress_display_enabled', self.keypress_enabled_checkbox.isChecked())
+        self.settings.set('keypress_display_x', self.keypress_x_spin.value())
+        self.settings.set('keypress_display_y', self.keypress_y_spin.value())
+        self.settings.set('keypress_display_font_size', self.font_size_spin.value())
         
         if self.settings.save():
             # 恢复鼠标同步

@@ -33,6 +33,7 @@ class ASoulLittleBun(QOpenGLWidget):
         self.hide_taskbar = self.window_manager.hide_taskbar
         self.mouse_locked = self.window_manager.mouse_locked
         self.keyboard_horizontal_offset = self.window_manager.keyboard_horizontal_offset
+        self.keypress_display_enabled = self.window_manager.keypress_display_enabled
         
         # 初始化角色管理器
         self.character_manager = CharacterManager()
@@ -102,6 +103,29 @@ class ASoulLittleBun(QOpenGLWidget):
         self.mouse_label = QLabel(self)
         self.left_click_label = QLabel(self)
         self.right_click_label = QLabel(self)
+        
+        # 创建按键显示标签
+        self.keypress_display_label = QLabel(self)
+        self.keypress_display_label.setStyleSheet(
+            f"color: white; "
+            f"background-color: rgba(0, 0, 0, 150); "
+            f"padding: 5px; "
+            f"border-radius: 5px; "
+            f"font-size: {self.settings.get('keypress_display_font_size', 16)}px; "
+            f"font-weight: bold;"
+        )
+        self.keypress_display_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.keypress_display_label.hide()
+        self.keypress_display_label.setGeometry(
+            self.settings.get('keypress_display_x', 10),
+            self.settings.get('keypress_display_y', 10),
+            100, 40
+        )
+        
+        # 按键显示定时器
+        self.keypress_display_timer = QTimer()
+        self.keypress_display_timer.timeout.connect(self._hide_keypress_display)
+        self.keypress_display_timer.setSingleShot(True)
         
         # 加载当前角色图片
         self.load_character_images()
@@ -188,10 +212,73 @@ class ASoulLittleBun(QOpenGLWidget):
     def _on_key_press_signal(self, key_identifier):
         """键盘按下信号处理"""
         self.input_handler.animate_key_press(self.keyboard_label, key_identifier)
+        # 显示按键
+        if self.keypress_display_enabled:
+            self._show_keypress_display(key_identifier)
     
     def _on_key_release_signal(self):
         """键盘释放信号处理"""
         self.input_handler.animate_key_release(self.keyboard_label)
+    
+    def _show_keypress_display(self, key_identifier):
+        """显示按键"""
+        if not key_identifier:
+            return
+        
+        # 格式化按键显示文本
+        display_text = self._format_key_display(key_identifier)
+        
+        self.keypress_display_label.setText(display_text)
+        self.keypress_display_label.adjustSize()
+        self.keypress_display_label.show()
+        
+        # 重启定时器，1秒后隐藏
+        self.keypress_display_timer.start(1000)
+    
+    def _hide_keypress_display(self):
+        """隐藏按键显示"""
+        self.keypress_display_label.hide()
+    
+    def _format_key_display(self, key_identifier):
+        """格式化按键显示文本"""
+        # 特殊按键映射
+        key_map = {
+            'space': 'Space',
+            'enter': 'Enter',
+            'backspace': 'Backspace',
+            'delete': 'Delete',
+            'tab': 'Tab',
+            'esc': 'Esc',
+            'caps_lock': 'Caps',
+            'shift': 'Shift',
+            'shift_l': 'L-Shift',
+            'shift_r': 'R-Shift',
+            'ctrl': 'Ctrl',
+            'ctrl_l': 'L-Ctrl',
+            'ctrl_r': 'R-Ctrl',
+            'alt': 'Alt',
+            'alt_l': 'L-Alt',
+            'alt_r': 'R-Alt',
+            'alt_gr': 'AltGr',
+            'cmd': 'Win',
+            'cmd_l': 'L-Win',
+            'cmd_r': 'R-Win',
+            'super': 'Win',
+            'up': '↑',
+            'down': '↓',
+            'left': '←',
+            'right': '→',
+            'page_up': 'PgUp',
+            'page_down': 'PgDn',
+            'home': 'Home',
+            'end': 'End',
+            'insert': 'Insert',
+            'f1': 'F1', 'f2': 'F2', 'f3': 'F3', 'f4': 'F4',
+            'f5': 'F5', 'f6': 'F6', 'f7': 'F7', 'f8': 'F8',
+            'f9': 'F9', 'f10': 'F10', 'f11': 'F11', 'f12': 'F12',
+        }
+        
+        return key_map.get(key_identifier, key_identifier.upper() if len(key_identifier) == 1 else key_identifier.title())
     
     def show_left_click(self):
         """显示左键图片"""
@@ -262,6 +349,17 @@ class ASoulLittleBun(QOpenGLWidget):
         self.input_handler.keyboard_horizontal_offset = self.keyboard_horizontal_offset
         self.tray_manager.create_tray_menu()
     
+    def toggle_keypress_display(self):
+        """切换按键显示状态"""
+        self.window_manager.toggle_keypress_display()
+        self.keypress_display_enabled = self.window_manager.keypress_display_enabled
+        
+        # 如果禁用，立即隐藏当前显示的按键
+        if not self.keypress_display_enabled:
+            self.keypress_display_label.hide()
+        
+        self.tray_manager.create_tray_menu()
+    
     def toggle_window_visibility(self):
         """切换窗口显示/隐藏状态"""
         if self.isVisible():
@@ -314,6 +412,21 @@ class ASoulLittleBun(QOpenGLWidget):
         
         # 更新鼠标跟踪器设置
         self.mouse_tracker.update_settings(self.settings)
+        
+        # 更新按键显示设置
+        self.keypress_display_label.setStyleSheet(
+            f"color: white; "
+            f"background-color: rgba(0, 0, 0, 150); "
+            f"padding: 5px; "
+            f"border-radius: 5px; "
+            f"font-size: {self.settings.get('keypress_display_font_size', 16)}px; "
+            f"font-weight: bold;"
+        )
+        self.keypress_display_label.setGeometry(
+            self.settings.get('keypress_display_x', 10),
+            self.settings.get('keypress_display_y', 10),
+            100, 40
+        )
         
         # 重新加载图片
         self.load_character_images()
@@ -425,6 +538,12 @@ class ASoulLittleBun(QOpenGLWidget):
         keyboard_horizontal_offset_action.setChecked(self.keyboard_horizontal_offset)
         keyboard_horizontal_offset_action.triggered.connect(self.toggle_keyboard_horizontal_offset)
         parent_menu.addAction(keyboard_horizontal_offset_action)
+        
+        keypress_display_action = QAction('按键显示', self)
+        keypress_display_action.setCheckable(True)
+        keypress_display_action.setChecked(self.keypress_display_enabled)
+        keypress_display_action.triggered.connect(self.toggle_keypress_display)
+        parent_menu.addAction(keypress_display_action)
     
     def _add_character_menu(self, parent_menu):
         """添加角色切换子菜单"""
