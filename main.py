@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QMenu, QDialog, QSystemTrayIcon, QMessageBox
-from PyQt6.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRect, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QCursor, QAction, QIcon, QSurfaceFormat
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from pynput import keyboard, mouse
@@ -10,8 +10,53 @@ from update_checker import UpdateChecker
 
 
 class ASoulLittleBun(QOpenGLWidget):
+    key_press_signal = pyqtSignal(object)
+    key_release_signal = pyqtSignal()
+
+    # Approximate QWERTY horizontal positions, using A as the zero point.
+    KEYBOARD_LAYOUT_UNITS = {
+        '`': -1.5, '1': -0.5, '2': 0.5, '3': 1.5, '4': 2.5, '5': 3.5, '6': 4.5,
+        '7': 5.5, '8': 6.5, '9': 7.5, '0': 8.5, '-': 9.5, '=': 10.5,
+        'q': -0.5, 'w': 0.5, 'e': 1.5, 'r': 2.5, 't': 3.5, 'y': 4.5, 'u': 5.5,
+        'i': 6.5, 'o': 7.5, 'p': 8.5, '[': 9.5, ']': 10.5, '\\': 11.5,
+        'a': 0.0, 's': 1.0, 'd': 2.0, 'f': 3.0, 'g': 4.0, 'h': 5.0, 'j': 6.0,
+        'k': 7.0, 'l': 8.0, ';': 9.0, "'": 10.0,
+        'z': -0.5, 'x': 0.5, 'c': 1.5, 'v': 2.5, 'b': 3.5, 'n': 4.5, 'm': 5.5,
+        ',': 6.5, '.': 7.5, '/': 8.5,
+    }
+    SPECIAL_KEYBOARD_UNITS = {
+        'esc': -1.5,
+        'tab': -1.0,
+        'caps_lock': -1.0,
+        'shift': 8.5,
+        'shift_l': -1.5,
+        'shift_r': 8.5,
+        'ctrl': -1.5,
+        'ctrl_l': -1.5,
+        'ctrl_r': 7.5,
+        'alt': 2.5,
+        'alt_l': 2.5,
+        'alt_r': 6.5,
+        'alt_gr': 6.5,
+        'cmd': 1.5,
+        'cmd_l': 1.5,
+        'cmd_r': 7.0,
+        'super': 1.5,
+        'space': 4.0,
+        'enter': 9.5,
+        'backspace': 10.5,
+        'delete': 10.5,
+        'up': 8.0,
+        'down': 8.0,
+        'left': 7.0,
+        'right': 9.0,
+    }
+    KEYBOARD_TRAVEL_REFERENCE = 8.0
+    
     def __init__(self):
         super().__init__()
+        self.key_press_signal.connect(self.animate_key_press)
+        self.key_release_signal.connect(self.animate_key_release)
         # 加载全局设置
         self.global_settings = GlobalSettings()
         
@@ -66,6 +111,7 @@ class ASoulLittleBun(QOpenGLWidget):
         
         # 键盘动画相关
         self.keyboard_offset_y = 0
+        self.keyboard_target_x = None
         self.keyboard_animation = None
         
         # 启动监听器
@@ -490,6 +536,7 @@ class ASoulLittleBun(QOpenGLWidget):
         kb_height = self.settings.get('keyboard_height')
         self.keyboard_label.setGeometry(kb_x, kb_y, kb_width, kb_height)
         self.keyboard_label.setScaledContents(True)
+        self.keyboard_target_x = kb_x
         
         # 加载鼠标图片，应用设置中的偏移和大小
         mouse_pixmap = QPixmap(char_data['mouse'])
@@ -556,12 +603,13 @@ class ASoulLittleBun(QOpenGLWidget):
     def on_key_press(self, key):
         """键盘按下事件"""
         # 使用QTimer在主线程中执行UI更新
-        QTimer.singleShot(0, self.animate_key_press)
+        key_identifier = self.get_key_identifier(key)
+        self.key_press_signal.emit(key_identifier)
     
     def on_key_release(self, key):
         """键盘释放事件"""
         # 使用QTimer在主线程中执行UI更新
-        QTimer.singleShot(0, self.animate_key_release)
+        self.key_release_signal.emit()
     
     def on_mouse_click(self, x, y, button, pressed):
         """鼠标点击事件"""
@@ -575,16 +623,51 @@ class ASoulLittleBun(QOpenGLWidget):
             # 鼠标释放
             QTimer.singleShot(0, self.hide_click_images)
     
-    def animate_key_press(self):
+    def get_key_identifier(self, key):
+        """Normalize a pynput key object into a layout key."""
+        key_char = getattr(key, 'char', None)
+        if key_char:
+            return key_char.lower()
+
+        key_name = getattr(key, 'name', None)
+        if key_name:
+            return key_name.lower()
+
+        key_text = str(key)
+        if key_text.startswith('Key.'):
+            return key_text.split('.', 1)[1].lower()
+
+        return None
+
+    def get_keyboard_target_x(self, key_identifier):
+        """Map the pressed key to a horizontal keyboard position."""
+        base_x = self.settings.get('keyboard_x')
+        current_target_x = self.keyboard_target_x if self.keyboard_target_x is not None else base_x
+
+        if not key_identifier:
+            return current_target_x
+
+        key_unit = self.KEYBOARD_LAYOUT_UNITS.get(key_identifier)
+        if key_unit is None:
+            key_unit = self.SPECIAL_KEYBOARD_UNITS.get(key_identifier)
+
+        if key_unit is None:
+            return current_target_x
+
+        horizontal_travel = self.settings.get('keyboard_horizontal_travel', 10)
+        target_offset = horizontal_travel * (key_unit / self.KEYBOARD_TRAVEL_REFERENCE)
+        return int(round(base_x + target_offset))
+
+    def animate_key_press(self, key_identifier=None):
         """键盘按下动画"""
         if self.keyboard_animation and self.keyboard_animation.state() == QPropertyAnimation.State.Running:
             self.keyboard_animation.stop()
         
-        kb_x = self.settings.get('keyboard_x')
         kb_y = self.settings.get('keyboard_y')
         press_offset = self.settings.get('keyboard_press_offset')
         kb_width = self.settings.get('keyboard_width')
         kb_height = self.settings.get('keyboard_height')
+        self.keyboard_target_x = self.get_keyboard_target_x(key_identifier)
         
         # 调试信息：检查配置是否正确加载
         if press_offset is None or press_offset <= 0:
@@ -594,7 +677,7 @@ class ASoulLittleBun(QOpenGLWidget):
         self.keyboard_animation = QPropertyAnimation(self.keyboard_label, b"geometry")
         self.keyboard_animation.setDuration(50)
         self.keyboard_animation.setStartValue(self.keyboard_label.geometry())
-        self.keyboard_animation.setEndValue(QRect(kb_x, kb_y + press_offset, kb_width, kb_height))
+        self.keyboard_animation.setEndValue(QRect(self.keyboard_target_x, kb_y + press_offset, kb_width, kb_height))
         self.keyboard_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         self.keyboard_animation.start()
     
@@ -607,6 +690,7 @@ class ASoulLittleBun(QOpenGLWidget):
         kb_y = self.settings.get('keyboard_y')
         kb_width = self.settings.get('keyboard_width')
         kb_height = self.settings.get('keyboard_height')
+        self.keyboard_target_x = kb_x
         
         self.keyboard_animation = QPropertyAnimation(self.keyboard_label, b"geometry")
         self.keyboard_animation.setDuration(100)

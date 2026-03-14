@@ -101,6 +101,7 @@ class Settings:
         'keyboard_width': 25,
         'keyboard_height': 25,
         'keyboard_press_offset': 5,
+        'keyboard_horizontal_travel': 10,
         'mouse_x': 190,
         'mouse_y': 90,
         'mouse_width': 25,
@@ -410,6 +411,21 @@ class SettingsDialog(QDialog):
         kb_press_layout.addWidget(self.kb_press_spin)
         keyboard_layout.addRow('按下偏移:', kb_press_layout)
         
+        # 键盘水平移动范围
+        kb_horizontal_layout = QHBoxLayout()
+        self.kb_horizontal_slider = QSlider(Qt.Orientation.Horizontal)
+        self.kb_horizontal_slider.setRange(0, 100)
+        self.kb_horizontal_slider.setValue(self.settings.get('keyboard_horizontal_travel', 10))
+        self.kb_horizontal_spin = QSpinBox()
+        self.kb_horizontal_spin.setRange(0, 100)
+        self.kb_horizontal_spin.setValue(self.settings.get('keyboard_horizontal_travel', 10))
+        self.kb_horizontal_spin.setSuffix(' px')
+        self.kb_horizontal_slider.valueChanged.connect(self.kb_horizontal_spin.setValue)
+        self.kb_horizontal_spin.valueChanged.connect(self.kb_horizontal_slider.setValue)
+        kb_horizontal_layout.addWidget(self.kb_horizontal_slider)
+        kb_horizontal_layout.addWidget(self.kb_horizontal_spin)
+        keyboard_layout.addRow('水平移动范围:', kb_horizontal_layout)
+        
         # 键盘宽度
         kb_width_layout = QHBoxLayout()
         self.kb_width_slider = QSlider(Qt.Orientation.Horizontal)
@@ -575,6 +591,7 @@ class SettingsDialog(QDialog):
         self.kb_width_spin.valueChanged.connect(self.apply_preview)
         self.kb_height_spin.valueChanged.connect(self.apply_preview)
         self.kb_press_spin.valueChanged.connect(self.apply_preview)
+        self.kb_horizontal_spin.valueChanged.connect(self.apply_preview)
         
         # 鼠标图片
         self.mouse_x_spin.valueChanged.connect(self.apply_preview)
@@ -857,6 +874,7 @@ class SettingsDialog(QDialog):
             'keyboard_width': self.kb_width_spin.value(),
             'keyboard_height': self.kb_height_spin.value(),
             'keyboard_press_offset': self.kb_press_spin.value(),
+            'keyboard_horizontal_travel': self.kb_horizontal_spin.value(),
             'mouse_x': self.mouse_x_spin.value(),
             'mouse_y': self.mouse_y_spin.value(),
             'mouse_width': self.mouse_width_spin.value(),
@@ -887,6 +905,7 @@ class SettingsDialog(QDialog):
         self.kb_width_spin.setValue(Settings.DEFAULT_SETTINGS['keyboard_width'])
         self.kb_height_spin.setValue(Settings.DEFAULT_SETTINGS['keyboard_height'])
         self.kb_press_spin.setValue(Settings.DEFAULT_SETTINGS['keyboard_press_offset'])
+        self.kb_horizontal_spin.setValue(Settings.DEFAULT_SETTINGS['keyboard_horizontal_travel'])
         self.mouse_x_spin.setValue(Settings.DEFAULT_SETTINGS['mouse_x'])
         self.mouse_y_spin.setValue(Settings.DEFAULT_SETTINGS['mouse_y'])
         self.mouse_width_spin.setValue(Settings.DEFAULT_SETTINGS['mouse_width'])
@@ -916,6 +935,7 @@ class SettingsDialog(QDialog):
         self.settings.set('keyboard_width', self.kb_width_spin.value())
         self.settings.set('keyboard_height', self.kb_height_spin.value())
         self.settings.set('keyboard_press_offset', self.kb_press_spin.value())
+        self.settings.set('keyboard_horizontal_travel', self.kb_horizontal_spin.value())
         self.settings.set('mouse_x', self.mouse_x_spin.value())
         self.settings.set('mouse_y', self.mouse_y_spin.value())
         self.settings.set('mouse_width', self.mouse_width_spin.value())
