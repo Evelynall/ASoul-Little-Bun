@@ -442,15 +442,8 @@ class ASoulLittleBun(QOpenGLWidget):
         # 更新鼠标跟踪器设置
         self.mouse_tracker.update_settings(self.settings)
         
-        # 更新按键显示设置
-        self.keypress_display_label.setStyleSheet(
-            f"color: white; "
-            f"background-color: rgba(0, 0, 0, 150); "
-            f"padding: 5px; "
-            f"border-radius: 5px; "
-            f"font-size: {self.settings.get('keypress_display_font_size', 16)}px; "
-            f"font-weight: bold;"
-        )
+        # 更新按键显示样式（根据背景开关设置）
+        self._update_keypress_display_style()
         self.keypress_display_label.setGeometry(
             self.settings.get('keypress_display_x', 10),
             self.settings.get('keypress_display_y', 10),
