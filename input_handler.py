@@ -47,6 +47,9 @@ class InputHandler:
     
     def start_listeners(self):
         """启动键盘和鼠标监听器"""
+        # 先停止现有的监听器，避免重复启动
+        self.stop_listeners()
+        
         # 键盘监听
         self.keyboard_listener = keyboard.Listener(
             on_press=self._on_key_press,
@@ -65,9 +68,18 @@ class InputHandler:
     def stop_listeners(self):
         """停止监听器"""
         if self.keyboard_listener:
-            self.keyboard_listener.stop()
+            try:
+                self.keyboard_listener.stop()
+            except:
+                pass  # 忽略停止时的异常
+            self.keyboard_listener = None
+            
         if self.mouse_listener:
-            self.mouse_listener.stop()
+            try:
+                self.mouse_listener.stop()
+            except:
+                pass  # 忽略停止时的异常
+            self.mouse_listener = None
     
     def _on_key_press(self, key):
         """键盘按下事件"""

@@ -1,8 +1,10 @@
 import sys
 import json
+import os
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QMenu, QDialog, QMessageBox
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
-from PyQt6.QtGui import QPainter, QAction, QIcon, QSurfaceFormat
+from PyQt6.QtGui import QPainter, QAction, QIcon, QSurfaceFormat, QPixmap
+from PyQt6.QtWidgets import QGraphicsOpacityEffect
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from pynput import mouse
 
@@ -12,6 +14,7 @@ from character_manager import CharacterManager
 from input_handler import InputHandler, MouseTracker
 from tray_manager import TrayManager
 from window_manager import WindowManager
+from custom_layer_manager import CustomLayerManager, CustomLayerDialog, build_all_layers
 
 
 class ASoulLittleBun(QOpenGLWidget):
@@ -39,6 +42,10 @@ class ASoulLittleBun(QOpenGLWidget):
         # 初始化角色管理器
         self.character_manager = CharacterManager()
         self.character_manager.initialize_from_global_settings(self.global_settings)
+        
+        # 初始化自定义图层管理器
+        self.custom_layer_manager = CustomLayerManager(self.character_manager.current_character)
+        self.custom_layers = []  # 存储自定义图层的QLabel
         
         # 从角色管理器获取设置
         self.settings = self.character_manager.settings
@@ -71,6 +78,11 @@ class ASoulLittleBun(QOpenGLWidget):
         self.mouse_timer = QTimer()
         self.mouse_timer.timeout.connect(self._update_mouse_position)
         self.mouse_timer.start(16)  # 约60fps
+        
+        # 启动自定义图层位置更新定时器
+        self.custom_layer_timer = QTimer()
+        self.custom_layer_timer.timeout.connect(self.update_custom_layers_position)
+        self.custom_layer_timer.start(16)  # 约60fps，与鼠标同步
     
     def init_ui(self):
         """初始化UI"""
@@ -123,6 +135,9 @@ class ASoulLittleBun(QOpenGLWidget):
         
         # 加载当前角色图片
         self.load_character_images()
+        
+        # 创建和加载自定义图层（含默认图层配置应用和堆叠顺序）
+        self.create_custom_layers()
         
         # 应用鼠标穿透设置
         self.window_manager.apply_mouse_passthrough()
@@ -177,10 +192,236 @@ class ASoulLittleBun(QOpenGLWidget):
         }
         self.character_manager.load_character_images(labels_dict)
     
+    def create_custom_layers(self):
+        """创建自定义图层，并按完整有序列表重排堆叠顺序"""
+        all_layers = build_all_layers(self.character_manager.current_character,
+                                      self.custom_layer_manager)
+        self._rebuild_custom_layer_labels(all_layers)
+        self._apply_default_layers_from_list(all_layers)
+        self._restack_all_layers(all_layers)
+
+    def _rebuild_custom_layer_labels(self, all_layers):
+        """根据有序图层列表重建自定义图层 QLabel"""
+        from custom_layer_manager import CustomLayer
+        for label in self.custom_layers:
+            label.deleteLater()
+        self.custom_layers.clear()
+
+        # 按照 all_layers 中的顺序创建自定义图层标签
+        for layer in all_layers:
+            if isinstance(layer, CustomLayer):
+                if os.path.exists(layer.image_path):
+                    label = QLabel(self)
+                    label.setPixmap(QPixmap(layer.image_path))
+                    label.setScaledContents(True)
+                    if layer.opacity < 1.0:
+                        effect = QGraphicsOpacityEffect()
+                        effect.setOpacity(layer.opacity)
+                        label.setGraphicsEffect(effect)
+                    x, y = self.calculate_layer_position(layer)
+                    label.setGeometry(x, y, layer.width, layer.height)
+                    label.show() if layer.visible else label.hide()
+                    self.custom_layers.append(label)
+                else:
+                    # 即使图片不存在，也要添加一个占位标签以保持索引一致
+                    label = QLabel(self)
+                    label.hide()
+                    self.custom_layers.append(label)
+    
+    def calculate_layer_position(self, layer):
+        """计算图层位置（考虑跟随设置）"""
+        base_x, base_y = layer.x, layer.y
+        
+        if layer.follow_type == "keyboard":
+            # 跟随键盘位置 - 获取键盘当前的实际位置
+            kb_geometry = self.keyboard_label.geometry()
+            kb_x = kb_geometry.x()
+            kb_y = kb_geometry.y()
+            return base_x + kb_x, base_y + kb_y
+        elif layer.follow_type == "mouse":
+            # 跟随鼠标位置 - 获取鼠标当前的实际位置
+            mouse_geometry = self.mouse_label.geometry()
+            mouse_x = mouse_geometry.x()
+            mouse_y = mouse_geometry.y()
+            return base_x + mouse_x, base_y + mouse_y
+        else:
+            # 不跟随，使用绝对位置
+            return base_x, base_y
+    
+    def update_custom_layers_position(self):
+        """更新自定义图层位置"""
+        if not hasattr(self, 'custom_layers') or not self.custom_layers:
+            return
+
+        from custom_layer_manager import CustomLayer
+        # Use in-memory layers sorted by z_index (no disk read)
+        custom_layers = sorted(
+            [l for l in self.custom_layer_manager.layers if l.visible],
+            key=lambda x: x.z_index
+        )
+
+        for i, layer in enumerate(custom_layers):
+            if i < len(self.custom_layers):
+                label = self.custom_layers[i]
+                x, y = self.calculate_layer_position(layer)
+                current = label.geometry()
+                if current.x() != x or current.y() != y:
+                    label.setGeometry(x, y, layer.width, layer.height)
+    
+    def open_custom_layer_manager(self):
+        """打开图层管理对话框"""
+        self.pause_input_monitoring()
+
+        try:
+            dialog = CustomLayerDialog(
+                self.custom_layer_manager, self,
+                character_name=self.character_manager.current_character,
+                settings=self.settings
+            )
+
+            dialog.layers_changed.connect(lambda: self.on_custom_layers_preview(dialog))
+            dialog.layers_applied.connect(self.on_custom_layers_applied)
+
+            dialog.exec()
+            # All save/discard logic is handled via layers_applied signal in closeEvent
+
+        finally:
+            self.resume_input_monitoring()
+
+    def on_custom_layers_preview(self, dialog):
+        """实时预览回调"""
+        if not dialog.realtime_preview_check.isChecked():
+            return
+
+        # 临时应用 temp_settings 进行预览
+        if self.settings and dialog.temp_settings:
+            orig = {k: self.settings.get(k) for k in dialog.temp_settings}
+            for k, v in dialog.temp_settings.items():
+                self.settings.set(k, v)
+            self._apply_geometry_from_settings()
+            self._rebuild_custom_layer_labels(dialog.all_layers)
+            self._apply_default_layers_from_list(dialog.all_layers)
+            self._restack_all_layers(dialog.all_layers)
+            for k, v in orig.items():
+                self.settings.set(k, v)
+        else:
+            self._rebuild_custom_layer_labels(dialog.all_layers)
+            self._apply_default_layers_from_list(dialog.all_layers)
+            self._restack_all_layers(dialog.all_layers)
+
+    def on_custom_layers_applied(self, ordered_layers):
+        """应用/关闭回调"""
+        if ordered_layers is None:
+            # 用户选择不保存，恢复已保存状态
+            self.create_custom_layers()
+            self._apply_default_layers_config()
+        else:
+            # settings 已由 dialog 保存，直接应用
+            self.apply_settings()
+
+    def _apply_default_layers_config(self):
+        """从已保存配置应用默认图层的透明度/可见性/堆叠顺序"""
+        all_layers = build_all_layers(self.character_manager.current_character,
+                                      self.custom_layer_manager)
+        self._apply_default_layers_from_list(all_layers)
+        self._restack_all_layers(all_layers)
+
+    def _apply_default_layers_from_list(self, all_layers):
+        """将有序图层列表中默认图层的属性应用到对应 QLabel"""
+        from custom_layer_manager import DefaultLayer
+        label_map = {
+            'bg': self.bg_label,
+            'keyboard': self.keyboard_label,
+            'mouse_click': self.mouse_label,
+        }
+        for layer in all_layers:
+            if not isinstance(layer, DefaultLayer):
+                continue
+            label = label_map.get(layer.layer_key)
+            if label is None:
+                continue
+            if layer.opacity < 1.0:
+                effect = QGraphicsOpacityEffect()
+                effect.setOpacity(layer.opacity)
+                label.setGraphicsEffect(effect)
+            else:
+                label.setGraphicsEffect(None)
+            if layer.layer_key != 'mouse_click':
+                label.show() if layer.visible else label.hide()
+
+    def _restack_all_layers(self, all_layers):
+        """按有序图层列表重排所有 QLabel 的堆叠顺序"""
+        from custom_layer_manager import DefaultLayer, CustomLayer
+        label_map = {
+            'bg': self.bg_label,
+            'keyboard': self.keyboard_label,
+            'mouse_click': self.mouse_label,
+        }
+        
+        # 按顺序提升图层，确保正确的堆叠顺序
+        custom_layer_index = 0
+        mouse_click_processed = False
+        keypress_display_processed = False
+        
+        for layer in all_layers:
+            if isinstance(layer, DefaultLayer):
+                label = label_map.get(layer.layer_key)
+                if label:
+                    label.raise_()
+                
+                # 当处理 mouse_click 图层时，同时处理相关的点击效果标签
+                if layer.layer_key == 'mouse_click':
+                    self.left_click_label.raise_()
+                    self.right_click_label.raise_()
+                    mouse_click_processed = True
+                
+                # 当处理 keypress_display 图层时，处理按键显示标签
+                if layer.layer_key == 'keypress_display' and hasattr(self, 'keypress_display_label'):
+                    self.keypress_display_label.raise_()
+                    keypress_display_processed = True
+                    
+            elif isinstance(layer, CustomLayer):
+                # 确保自定义图层按照 all_layers 中的顺序对应到 self.custom_layers
+                if custom_layer_index < len(self.custom_layers):
+                    label = self.custom_layers[custom_layer_index]
+                    label.raise_()
+                    custom_layer_index += 1
+
+        # 如果 mouse_click 图层没有在图层列表中被处理，则默认将点击效果放在最上层
+        if not mouse_click_processed:
+            self.left_click_label.raise_()
+            self.right_click_label.raise_()
+        
+        # 如果 keypress_display 图层没有在图层列表中被处理，则默认将按键显示放在最上层
+        if not keypress_display_processed and hasattr(self, 'keypress_display_label'):
+            self.keypress_display_label.raise_()
+    
+    def pause_input_monitoring(self):
+        """暂停输入监听"""
+        if hasattr(self, 'input_handler'):
+            self.input_handler.stop_listeners()
+        if hasattr(self, 'mouse_timer'):
+            self.mouse_timer.stop()
+        if hasattr(self, 'custom_layer_timer'):
+            self.custom_layer_timer.stop()
+    
+    def resume_input_monitoring(self):
+        """恢复输入监听"""
+        # 重新启动输入处理器的监听
+        if hasattr(self, 'input_handler'):
+            self.input_handler.start_listeners()
+        
+        # 恢复定时器
+        if hasattr(self, 'mouse_timer'):
+            self.mouse_timer.start(16)  # 约60fps
+        if hasattr(self, 'custom_layer_timer'):
+            self.custom_layer_timer.start(16)  # 约60fps
+
     def switch_to_character(self, character_name):
         """切换到指定角色"""
         if self.character_manager.set_character(character_name, self.global_settings):
             self.settings = self.character_manager.settings
+            self.custom_layer_manager = CustomLayerManager(character_name)
             self.apply_settings()
             self.tray_manager.create_tray_menu()
     
@@ -209,10 +450,14 @@ class ASoulLittleBun(QOpenGLWidget):
         # 显示按键
         if self.keypress_display_enabled:
             self._show_keypress_display(key_identifier)
+        # 更新跟随键盘的自定义图层位置
+        self.update_custom_layers_position()
     
     def _on_key_release_signal(self):
         """键盘释放信号处理"""
         self.input_handler.animate_key_release(self.keyboard_label)
+        # 更新跟随键盘的自定义图层位置
+        self.update_custom_layers_position()
     
     def _show_keypress_display(self, key_identifier):
         """显示按键"""
@@ -405,9 +650,16 @@ class ASoulLittleBun(QOpenGLWidget):
     # 设置和关于
     def open_settings(self):
         """打开设置对话框"""
-        dialog = SettingsDialog(self.settings, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.apply_settings()
+        # 暂停输入监听，避免在编辑时干扰
+        self.pause_input_monitoring()
+        
+        try:
+            dialog = SettingsDialog(self.settings, self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.apply_settings()
+        finally:
+            # 无论如何都要恢复输入监听
+            self.resume_input_monitoring()
     
     def show_about(self):
         """显示关于对话框"""
@@ -438,20 +690,46 @@ class ASoulLittleBun(QOpenGLWidget):
         self.window_width = self.settings.get('window_width')
         self.window_height = self.settings.get('window_height')
         self.resize(self.window_width, self.window_height)
-        
-        # 更新鼠标跟踪器设置
+
         self.mouse_tracker.update_settings(self.settings)
-        
-        # 更新按键显示样式（根据背景开关设置）
         self._update_keypress_display_style()
         self.keypress_display_label.setGeometry(
             self.settings.get('keypress_display_x', 10),
             self.settings.get('keypress_display_y', 10),
             100, 40
         )
-        
-        # 重新加载图片
+
         self.load_character_images()
+        self.create_custom_layers()
+    
+    def _apply_geometry_from_settings(self):
+        """仅更新各图层的几何尺寸（不保存、不重载图片），用于实时预览"""
+        s = self.settings
+        w = s.get('window_width')
+        h = s.get('window_height')
+        self.resize(w, h)
+        
+        self.bg_label.setGeometry(0, 0, s.get('bg_width'), s.get('bg_height'))
+        
+        kb_x = s.get('keyboard_x')
+        kb_y = s.get('keyboard_y')
+        kb_w = s.get('keyboard_width')
+        kb_h = s.get('keyboard_height')
+        self.keyboard_label.setGeometry(kb_x, kb_y, kb_w, kb_h)
+        
+        mx = s.get('mouse_x')
+        my = s.get('mouse_y')
+        mw = s.get('mouse_width')
+        mh = s.get('mouse_height')
+        self.mouse_label.setGeometry(mx, my, mw, mh)
+        self.left_click_label.setGeometry(mx, my, mw, mh)
+        self.right_click_label.setGeometry(mx, my, mw, mh)
+        
+        self.keypress_display_label.setGeometry(
+            s.get('keypress_display_x', 10),
+            s.get('keypress_display_y', 10),
+            100, 40
+        )
     
     def get_version(self):
         """从version.json文件读取版本号"""
@@ -510,6 +788,11 @@ class ASoulLittleBun(QOpenGLWidget):
         
         # 切换角色
         self._add_character_menu(menu)
+        
+        # 自定义图层管理
+        custom_layer_action = QAction('自定义图层管理', self)
+        custom_layer_action.triggered.connect(self.open_custom_layer_manager)
+        menu.addAction(custom_layer_action)
         
         # 设置菜单
         settings_action = QAction('设置', self)
@@ -599,6 +882,8 @@ class ASoulLittleBun(QOpenGLWidget):
         # 停止定时器
         if hasattr(self, 'mouse_timer'):
             self.mouse_timer.stop()
+        if hasattr(self, 'custom_layer_timer'):
+            self.custom_layer_timer.stop()
         
         # 停止监听器
         self.input_handler.stop_listeners()
