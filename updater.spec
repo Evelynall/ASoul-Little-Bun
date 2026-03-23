@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['updater.py'],
+    ['updater_new.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -27,7 +27,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='updater',
+    name='updater_new',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

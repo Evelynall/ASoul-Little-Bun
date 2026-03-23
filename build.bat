@@ -18,7 +18,7 @@ if exist dist rmdir /s /q dist
 
 echo.
 echo ========================================
-echo Step 1/2: Building updater.exe...
+echo Step 1/2: Building updater_new.exe...
 echo ========================================
 pyinstaller updater.spec --clean
 
@@ -75,7 +75,7 @@ echo ========================================
 echo.
 echo Output files:
 echo   Main program: dist\ASoul-Little-Bun.exe (~15-25MB)
-echo   Updater:      dist\updater.exe (~10-15MB)
+echo   Updater:      dist\updater_new.exe (~10-15MB)
 echo   Resources:    dist\img\
 echo   Version:      dist\version.json
 echo.

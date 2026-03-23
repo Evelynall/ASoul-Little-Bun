@@ -1,10 +1,11 @@
 import json
 import os
 import sys
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                               QSpinBox, QPushButton, QGroupBox, QFormLayout,
                               QSlider, QScrollArea, QWidget, QApplication, QCheckBox, QTabWidget)
 from PyQt6.QtCore import Qt
+from path_manager import path_manager
 
 
 class GlobalSettings:
@@ -16,7 +17,11 @@ class GlobalSettings:
     }
     
     def __init__(self, config_file='global_config.json'):
-        self.config_file = config_file
+        # 使用路径管理器获取绝对路径
+        if not os.path.isabs(config_file):
+            self.config_file = path_manager.get_global_config_file()
+        else:
+            self.config_file = config_file
         self.settings = self.load()
     
     def load(self):
@@ -85,8 +90,8 @@ class GlobalSettings:
             # 打包后的exe文件
             return sys.executable
         else:
-            # Python脚本
-            return os.path.abspath(os.path.join(os.path.dirname(__file__), 'main.py'))
+            # Python脚本 - 使用路径管理器
+            return path_manager.get_path('main.py')
 
 
 class Settings:
@@ -108,6 +113,7 @@ class Settings:
         'mouse_height': 25,
         'max_mouse_offset': 20,
         'mouse_sensitivity': 0.3,
+        'mouse_return_speed': 0.05,
         'sync_scale_enabled': False,
         'keypress_display_enabled': True,
         'keypress_display_x': 8,
@@ -383,19 +389,15 @@ class SettingsDialog(QDialog):
             QMessageBox.information(self, "成功", "已打开启动文件夹")
         else:
             startup_folder = GlobalSettings.get_startup_folder()
-            QMessageBox.warning(self, "失败", 
+            QMessageBox.warning(self, "失败",
                               f"无法打开启动文件夹\n路径：{startup_folder}")
 
-    def apply_preview(self):
-        """应用预览设置 - 已移至图层管理器"""
-        pass
-    
     def reset_settings(self):
-        """重置为默认设置 - 已移至图层管理器"""
+        """重置为默认设置"""
         pass
-    
+
     def save_settings(self):
-        """保存设置 - 图像调整功能已移至图层管理器"""
+        """保存设置"""
         # 只保存基本设置，图像调整设置在图层管理器中处理
         if self.settings.save():
             # 恢复鼠标同步

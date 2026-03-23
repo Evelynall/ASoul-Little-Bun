@@ -182,18 +182,21 @@ class InputHandler:
 
 class MouseTracker:
     """鼠标跟踪器 - 负责鼠标位置同步"""
-    
+
     def __init__(self, settings, mouse_locked=False):
         self.settings = settings
         self.mouse_locked = mouse_locked
-        
+
         # 鼠标同步移动相关
         self.last_mouse_pos = QCursor.pos()
         self.mouse_offset_x = 0
         self.mouse_offset_y = 0
         self.max_mouse_offset = settings.get('max_mouse_offset')
         self.mouse_sensitivity = settings.get('mouse_sensitivity')
-        
+
+        # 鼠标回正速度（从设置中读取）
+        self.mouse_return_speed = settings.get('mouse_return_speed', 0.05)
+
         # 鼠标位置突变过滤相关
         self.mouse_jump_threshold = 100
         self.mouse_velocity_x = 0
@@ -205,6 +208,7 @@ class MouseTracker:
         self.settings = settings
         self.max_mouse_offset = settings.get('max_mouse_offset')
         self.mouse_sensitivity = settings.get('mouse_sensitivity')
+        self.mouse_return_speed = settings.get('mouse_return_speed', 0.05)
     
     def set_locked(self, locked):
         """设置鼠标锁定状态"""
@@ -262,11 +266,12 @@ class MouseTracker:
         mouse_label.setGeometry(new_x, new_y, mouse_width, mouse_height)
         left_click_label.setGeometry(new_x, new_y, mouse_width, mouse_height)
         right_click_label.setGeometry(new_x, new_y, mouse_width, mouse_height)
-        
-        # 缓慢回归中心
-        self.mouse_offset_x *= 0.95
-        self.mouse_offset_y *= 0.95
-        self.mouse_velocity_x *= 0.95
-        self.mouse_velocity_y *= 0.95
-        
+
+        # 缓慢回归中心（使用可配置的回正速度）
+        return_factor = 1.0 - self.mouse_return_speed
+        self.mouse_offset_x *= return_factor
+        self.mouse_offset_y *= return_factor
+        self.mouse_velocity_x *= return_factor
+        self.mouse_velocity_y *= return_factor
+
         self.last_mouse_pos = current_pos

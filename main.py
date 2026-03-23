@@ -14,7 +14,9 @@ from character_manager import CharacterManager
 from input_handler import InputHandler, MouseTracker
 from tray_manager import TrayManager
 from window_manager import WindowManager
-from custom_layer_manager import CustomLayerManager, CustomLayerDialog, build_all_layers
+from custom_layer_manager import CustomLayerManager, CustomLayer, DefaultLayer, build_all_layers
+from custom_layer_dialog import CustomLayerDialog
+from path_manager import path_manager
 
 
 class ASoulLittleBun(QOpenGLWidget):
@@ -202,7 +204,6 @@ class ASoulLittleBun(QOpenGLWidget):
 
     def _rebuild_custom_layer_labels(self, all_layers):
         """根据有序图层列表重建自定义图层 QLabel"""
-        from custom_layer_manager import CustomLayer
         for label in self.custom_layers:
             label.deleteLater()
         self.custom_layers.clear()
@@ -253,7 +254,6 @@ class ASoulLittleBun(QOpenGLWidget):
         if not hasattr(self, 'custom_layers') or not self.custom_layers:
             return
 
-        from custom_layer_manager import CustomLayer
         # Use in-memory layers sorted by z_index (no disk read)
         custom_layers = sorted(
             [l for l in self.custom_layer_manager.layers if l.visible],
@@ -328,7 +328,6 @@ class ASoulLittleBun(QOpenGLWidget):
 
     def _apply_default_layers_from_list(self, all_layers):
         """将有序图层列表中默认图层的属性应用到对应 QLabel"""
-        from custom_layer_manager import DefaultLayer
         label_map = {
             'bg': self.bg_label,
             'keyboard': self.keyboard_label,
@@ -351,7 +350,6 @@ class ASoulLittleBun(QOpenGLWidget):
 
     def _restack_all_layers(self, all_layers):
         """按有序图层列表重排所有 QLabel 的堆叠顺序"""
-        from custom_layer_manager import DefaultLayer, CustomLayer
         label_map = {
             'bg': self.bg_label,
             'keyboard': self.keyboard_label,
@@ -734,7 +732,8 @@ class ASoulLittleBun(QOpenGLWidget):
     def get_version(self):
         """从version.json文件读取版本号"""
         try:
-            with open('version.json', 'r', encoding='utf-8') as f:
+            version_file = path_manager.get_version_file()
+            with open(version_file, 'r', encoding='utf-8') as f:
                 version_data = json.load(f)
                 return version_data.get('version', '1.0.0')
         except (FileNotFoundError, json.JSONDecodeError, KeyError):

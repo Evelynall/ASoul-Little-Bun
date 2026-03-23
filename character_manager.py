@@ -1,13 +1,18 @@
 import os
 from PyQt6.QtGui import QPixmap
 from settings import Settings
+from path_manager import path_manager
 
 
 class CharacterManager:
     """角色管理器 - 负责角色的加载、切换和图片管理"""
     
     def __init__(self, img_dir='img'):
-        self.img_dir = img_dir
+        # 使用路径管理器获取img目录的绝对路径
+        if not os.path.isabs(img_dir):
+            self.img_dir = path_manager.get_img_dir()
+        else:
+            self.img_dir = img_dir
         self.characters = {}
         self.current_character = None
         self.current_character_index = 0

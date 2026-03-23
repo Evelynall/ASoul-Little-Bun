@@ -1,7 +1,9 @@
 """
-自动更新程序
+自动更新程序（新版）
 用于下载和替换主程序文件
 支持配置文件合并策略：已有键保留用户值，只新增缺失的键
+支持自我更新（通过延迟替换脚本）
+启动后会自动清理旧版 updater.exe
 """
 import sys
 import os
@@ -178,7 +180,7 @@ class Updater:
             return None
     
     def replace_files(self, extract_dir):
-        """替换文件，对配置文件使用智能合并策略，支持 updater 自更新"""
+        """替换文件，对配置文件使用智能合并策略，支持 updater_new 自更新"""
         try:
             print("正在替换文件...")
             current_dir = Path.cwd()
@@ -196,11 +198,11 @@ class Updater:
                 shutil.rmtree(backup_dir)
             backup_dir.mkdir(exist_ok=True)
             
-            # 获取当前 updater 的文件名（updater.exe 或 updater.py）
+            # 获取当前 updater 的文件名（updater_new.exe 或 updater_new.py）
             if getattr(sys, 'frozen', False):
-                updater_name = Path(sys.executable).name  # updater.exe
+                updater_name = Path(sys.executable).name  # updater_new.exe
             else:
-                updater_name = Path(__file__).name  # updater.py
+                updater_name = Path(__file__).name  # updater_new.py
             
             # 延迟替换：新版 updater 的源文件路径
             pending_updater_source = None
@@ -222,7 +224,12 @@ class Updater:
                 if 'temp_update' in rel_path.parts or 'backup_before_update' in rel_path.parts:
                     continue
                 
-                # updater 自身：记录下来，稍后延迟替换
+                # 跳过旧版 updater.exe / updater.py（不替换旧版，稍后统一清理）
+                if rel_path.name in ('updater.exe', 'updater.py'):
+                    print(f"跳过旧版更新程序: {rel_path.name}（稍后清理）")
+                    continue
+                
+                # updater_new 自身：记录下来，稍后延迟替换
                 if rel_path.name == updater_name:
                     print(f"检测到新版更新程序，将在所有文件替换完成后进行自我更新")
                     pending_updater_source = source_file
@@ -276,6 +283,9 @@ class Updater:
                 self.pending_self_update = True
                 self._self_update(pending_updater_source, current_dir, updater_name)
             
+            # 清理旧版 updater.exe / updater.py（如果存在）
+            self._cleanup_old_updater(current_dir)
+            
             print("文件替换完成！")
             return True
             
@@ -283,6 +293,21 @@ class Updater:
             print(f"替换文件失败: {e}")
             return False
     
+    def _cleanup_old_updater(self, current_dir):
+        """
+        清理旧版 updater.exe / updater.py。
+        旧版更新程序无法自我更新到新版，因此新版启动后主动删除旧版文件。
+        """
+        old_files = ['updater.exe', 'updater.py']
+        for name in old_files:
+            old_path = current_dir / name
+            if old_path.exists():
+                try:
+                    os.remove(old_path)
+                    print(f"已清理旧版更新程序: {name}")
+                except Exception as e:
+                    print(f"清理旧版更新程序 {name} 失败: {e}")
+
     def _self_update(self, new_updater_path, current_dir, updater_name):
         """
         延迟自我更新：创建一个 bat 脚本，在当前 updater 退出后替换自身。

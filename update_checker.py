@@ -4,10 +4,11 @@ import os
 import shutil
 import sys
 import subprocess
-from PyQt6.QtWidgets import (QMessageBox, QDialog, QVBoxLayout, QTextBrowser, 
+from PyQt6.QtWidgets import (QMessageBox, QDialog, QVBoxLayout, QTextBrowser,
                               QPushButton, QHBoxLayout, QProgressBar, QLabel, QWidget)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from packaging import version as pkg_version
+from path_manager import path_manager
 
 
 class UpdateCheckThread(QThread):
@@ -108,7 +109,8 @@ class UpdateChecker:
     def get_local_version(self):
         """获取本地版本号"""
         try:
-            with open('version.json', 'r', encoding='utf-8') as f:
+            version_file = path_manager.get_version_file()
+            with open(version_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 return data.get('version', '1.0.0')
         except Exception as e:
@@ -409,31 +411,56 @@ class UpdateChecker:
                 current_exe = os.path.abspath(os.path.join(os.path.dirname(__file__), 'main.py'))
                 current_dir = os.path.dirname(__file__)
             
-            # 优先查找updater.exe
+            # 优先查找新版 updater_new.exe
+            updater_new_exe = os.path.join(current_dir, 'updater_new.exe')
             updater_exe = os.path.join(current_dir, 'updater.exe')
+            updater_new_script = os.path.join(current_dir, 'updater_new.py')
             updater_script = os.path.join(current_dir, 'updater.py')
             
-            # 如果是打包模式且updater.exe不存在，尝试从临时目录提取
-            if getattr(sys, 'frozen', False) and not os.path.exists(updater_exe):
+            # 如果是打包模式且updater_new.exe不存在，尝试从临时目录提取
+            if getattr(sys, 'frozen', False) and not os.path.exists(updater_new_exe):
                 if hasattr(sys, '_MEIPASS'):
-                    temp_updater = os.path.join(sys._MEIPASS, 'updater.exe')
+                    temp_updater = os.path.join(sys._MEIPASS, 'updater_new.exe')
                     if os.path.exists(temp_updater):
                         import shutil
-                        shutil.copy2(temp_updater, updater_exe)
-                        print(f"已提取updater.exe到: {updater_exe}")
+                        shutil.copy2(temp_updater, updater_new_exe)
+                        print(f"已提取updater_new.exe到: {updater_new_exe}")
             
-            # 确定使用哪个更新程序
+            # 确定使用哪个更新程序（优先使用新版）
+            use_new_exe = os.path.exists(updater_new_exe)
+            use_new_script = os.path.exists(updater_new_script)
             use_exe = os.path.exists(updater_exe)
             use_script = os.path.exists(updater_script)
             
-            if not use_exe and not use_script:
+            if not use_new_exe and not use_new_script and not use_exe and not use_script:
                 QMessageBox.warning(dialog, "错误", 
                     "未找到更新程序！\n\n"
-                    "请确保updater.exe或updater.py与程序在同一目录")
+                    "请确保updater_new.exe或updater_new.py与程序在同一目录")
                 return
             
+            # 清理旧版 updater.exe（如果存在且新版也存在）
+            if (use_new_exe or use_new_script) and use_exe:
+                try:
+                    os.remove(updater_exe)
+                    print(f"已清理旧版更新程序: updater.exe")
+                except Exception as e:
+                    print(f"清理旧版updater.exe失败: {e}")
+            if (use_new_exe or use_new_script) and use_script:
+                try:
+                    os.remove(updater_script)
+                    print(f"已清理旧版更新程序: updater.py")
+                except Exception as e:
+                    print(f"清理旧版updater.py失败: {e}")
+            
             # 显示确认对话框
-            updater_type = "updater.exe" if use_exe else "updater.py (需要Python)"
+            if use_new_exe:
+                updater_type = "updater_new.exe"
+            elif use_new_script:
+                updater_type = "updater_new.py (需要Python)"
+            elif use_exe:
+                updater_type = "updater.exe"
+            else:
+                updater_type = "updater.py (需要Python)"
             reply = QMessageBox.question(
                 dialog, 
                 "确认更新", 
@@ -444,12 +471,23 @@ class UpdateChecker:
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                # 启动更新程序
-                if use_exe:
-                    # 使用exe版本（无需Python）
+                # 启动更新程序（优先使用新版）
+                if use_new_exe:
+                    subprocess.Popen([updater_new_exe, zip_path, current_exe])
+                elif use_new_script:
+                    try:
+                        subprocess.Popen([sys.executable, updater_new_script, zip_path, current_exe])
+                    except:
+                        try:
+                            subprocess.Popen(['python', updater_new_script, zip_path, current_exe])
+                        except:
+                            QMessageBox.critical(dialog, "错误", 
+                                "无法启动更新程序！\n\n"
+                                "请确保系统已安装Python")
+                            return
+                elif use_exe:
                     subprocess.Popen([updater_exe, zip_path, current_exe])
-                else:
-                    # 使用Python脚本版本
+                elif use_script:
                     try:
                         subprocess.Popen([sys.executable, updater_script, zip_path, current_exe])
                     except:
