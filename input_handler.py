@@ -41,6 +41,16 @@ class InputHandler:
         self.keyboard_target_x = None
         self.keyboard_animation = None
         
+        # 修饰键追踪（用于组合键显示）
+        self._modifier_keys = set()  # 当前按住的修饰键集合
+        # pynput Key 对象 -> 显示名称
+        self._MODIFIER_DISPLAY = {
+            'ctrl_l': 'Ctrl', 'ctrl_r': 'Ctrl', 'ctrl': 'Ctrl',
+            'shift_l': 'Shift', 'shift_r': 'Shift', 'shift': 'Shift',
+            'alt_l': 'Alt', 'alt_r': 'Alt', 'alt': 'Alt', 'alt_gr': 'AltGr',
+            'cmd_l': 'Win', 'cmd_r': 'Win', 'cmd': 'Win', 'super': 'Win',
+        }
+        
         # 监听器
         self.keyboard_listener = None
         self.mouse_listener = None
@@ -84,11 +94,48 @@ class InputHandler:
     def _on_key_press(self, key):
         """键盘按下事件"""
         key_identifier = self.get_key_identifier(key)
-        self.key_press_callback(key_identifier)
+        
+        # 如果是修饰键，记录到集合中
+        if key_identifier and key_identifier in self._MODIFIER_DISPLAY:
+            self._modifier_keys.add(key_identifier)
+        
+        # 构造组合键标识符（用于按键显示）
+        combined_identifier = self._build_combined_identifier(key_identifier)
+        self.key_press_callback(combined_identifier)
     
     def _on_key_release(self, key):
         """键盘释放事件"""
+        key_identifier = self.get_key_identifier(key)
+        # 释放修饰键时从集合中移除
+        if key_identifier and key_identifier in self._modifier_keys:
+            self._modifier_keys.discard(key_identifier)
         self.key_release_callback()
+    
+    def _build_combined_identifier(self, key_identifier):
+        """根据当前修饰键状态构造组合键标识符"""
+        if not key_identifier:
+            return key_identifier
+        
+        # 收集当前激活的修饰键（去重，保持固定顺序）
+        active_modifiers = []
+        seen = set()
+        for mod_key in ['ctrl_l', 'ctrl_r', 'ctrl',
+                        'shift_l', 'shift_r', 'shift',
+                        'alt_l', 'alt_r', 'alt', 'alt_gr',
+                        'cmd_l', 'cmd_r', 'cmd', 'super']:
+            if mod_key in self._modifier_keys:
+                display = self._MODIFIER_DISPLAY[mod_key]
+                if display not in seen:
+                    seen.add(display)
+                    active_modifiers.append(display)
+        
+        # 如果当前按键本身就是修饰键，直接返回原标识符（不组合）
+        if key_identifier in self._MODIFIER_DISPLAY:
+            return key_identifier
+        
+        if active_modifiers:
+            return '+'.join(active_modifiers) + '+' + key_identifier
+        return key_identifier
     
     def _on_mouse_click(self, x, y, button, pressed):
         """鼠标点击事件"""
@@ -99,7 +146,14 @@ class InputHandler:
         """标准化按键标识符"""
         key_char = getattr(key, 'char', None)
         if key_char:
-            return key_char.lower()
+            if key_char.isprintable():
+                # 普通可打印字符
+                return key_char.lower()
+            else:
+                # 控制字符（Ctrl+字母键产生，ord 1-26 对应 a-z）
+                code = ord(key_char)
+                if 1 <= code <= 26:
+                    return chr(code + 96)  # 反推出原始字母，如 \x03 -> 'c'
 
         key_name = getattr(key, 'name', None)
         if key_name:

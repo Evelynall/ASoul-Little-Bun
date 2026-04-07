@@ -27,10 +27,10 @@ class ASoulLittleBun(QOpenGLWidget):
         super().__init__()
         self.key_press_signal.connect(self._on_key_press_signal)
         self.key_release_signal.connect(self._on_key_release_signal)
-        
+
         # 加载全局设置
         self.global_settings = GlobalSettings()
-        
+
         # 初始化窗口管理器
         self.window_manager = WindowManager(self, self.global_settings)
         self.always_on_top = self.window_manager.always_on_top
@@ -40,27 +40,29 @@ class ASoulLittleBun(QOpenGLWidget):
         self.keyboard_horizontal_offset = self.window_manager.keyboard_horizontal_offset
         self.keypress_display_enabled = self.window_manager.keypress_display_enabled
         self.keypress_display_background = self.window_manager.keypress_display_background
-        
+
         # 初始化角色管理器
         self.character_manager = CharacterManager()
-        self.character_manager.initialize_from_global_settings(self.global_settings)
-        
+        self.character_manager.initialize_from_global_settings(
+            self.global_settings)
+
         # 初始化自定义图层管理器
-        self.custom_layer_manager = CustomLayerManager(self.character_manager.current_character)
+        self.custom_layer_manager = CustomLayerManager(
+            self.character_manager.current_character)
         self.custom_layers = []  # 存储自定义图层的QLabel
-        
+
         # 从角色管理器获取设置
         self.settings = self.character_manager.settings
         self.window_width = self.settings.get('window_width')
         self.window_height = self.settings.get('window_height')
-        
+
         # 初始化系统托盘
         self.tray_manager = TrayManager(self)
         self.tray_manager.init_tray()
-        
+
         # 初始化UI
         self.init_ui()
-        
+
         # 初始化输入处理器
         self.input_handler = InputHandler(
             self.settings,
@@ -69,35 +71,41 @@ class ASoulLittleBun(QOpenGLWidget):
             self._handle_mouse_click,
             self.keyboard_horizontal_offset
         )
-        
+
         # 初始化鼠标跟踪器
         self.mouse_tracker = MouseTracker(self.settings, self.mouse_locked)
-        
+
         # 启动监听器
         self.input_handler.start_listeners()
-        
+
         # 启动鼠标同步定时器
         self.mouse_timer = QTimer()
         self.mouse_timer.timeout.connect(self._update_mouse_position)
         self.mouse_timer.start(16)  # 约60fps
-        
+
         # 启动自定义图层位置更新定时器
         self.custom_layer_timer = QTimer()
-        self.custom_layer_timer.timeout.connect(self.update_custom_layers_position)
+        self.custom_layer_timer.timeout.connect(
+            self.update_custom_layers_position)
         self.custom_layer_timer.start(16)  # 约60fps，与鼠标同步
-    
+
+        # 按键预览状态标志
+        self._is_keypress_preview_active = False
+        self._keypress_preview_text = "Ctrl"  # 预览时的示例文本
+
     def init_ui(self):
         """初始化UI"""
         # 设置基础窗口属性
         flags = Qt.WindowType.FramelessWindowHint
         if self.always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
-            
+
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, self.always_on_top)
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_AlwaysStackOnTop, self.always_on_top)
         self.setWindowTitle("ASoul Little Bun")
-        
+
         # 设置窗口图标
         if self.character_manager.current_character:
             icon_path = f"img/{self.character_manager.current_character}/bgImage.png"
@@ -105,20 +113,20 @@ class ASoulLittleBun(QOpenGLWidget):
                 self.setWindowIcon(QIcon(icon_path))
             except:
                 pass
-        
+
         # 设置窗口大小
         self.resize(self.window_width, self.window_height)
-        
+
         # 设置窗口位置
         self._set_window_position()
-        
+
         # 创建图层标签
         self.bg_label = QLabel(self)
         self.keyboard_label = QLabel(self)
         self.mouse_label = QLabel(self)
         self.left_click_label = QLabel(self)
         self.right_click_label = QLabel(self)
-        
+
         # 创建按键显示标签
         self.keypress_display_label = QLabel(self)
         self._update_keypress_display_style()
@@ -129,52 +137,53 @@ class ASoulLittleBun(QOpenGLWidget):
             self.settings.get('keypress_display_y', 10),
             100, 40
         )
-        
+
         # 按键显示定时器
         self.keypress_display_timer = QTimer()
-        self.keypress_display_timer.timeout.connect(self._hide_keypress_display)
+        self.keypress_display_timer.timeout.connect(
+            self._hide_keypress_display)
         self.keypress_display_timer.setSingleShot(True)
-        
+
         # 加载当前角色图片
         self.load_character_images()
-        
+
         # 创建和加载自定义图层（含默认图层配置应用和堆叠顺序）
         self.create_custom_layers()
-        
+
         # 应用鼠标穿透设置
         self.window_manager.apply_mouse_passthrough()
-        
+
         # 允许拖动窗口
         self.dragging = False
         self.drag_position = QPoint()
-        
+
         self.show()
-        
+
         # 根据设置决定是否隐藏任务栏
         if self.hide_taskbar:
             self.window_manager.apply_hide_taskbar()
-        
+
         # 显示首次启动提示
         self.window_manager.show_first_launch_tip()
-        
+
         # 检查更新
         QTimer.singleShot(1000, self.check_for_updates)
-    
+
     def _set_window_position(self):
         """设置窗口位置"""
         screen = QApplication.primaryScreen()
         screen_geometry = screen.geometry()
-        
+
         window_x = self.global_settings.get('window_x')
         window_y = self.global_settings.get('window_y')
-        
+
         if window_x is None or window_y is None:
             center_x = (screen_geometry.width() - self.window_width) // 2
             center_y = (screen_geometry.height() - self.window_height) // 2
             self.move(center_x, center_y)
         else:
             self.move(window_x, window_y)
-    
+
     def paintEvent(self, event):
         """重写 paintEvent 以支持 OpenGL 渲染和透明背景"""
         painter = QPainter(self)
@@ -182,7 +191,7 @@ class ASoulLittleBun(QOpenGLWidget):
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.fillRect(self.rect(), Qt.GlobalColor.transparent)
         painter.end()
-    
+
     def load_character_images(self):
         """加载当前角色的图片"""
         labels_dict = {
@@ -193,7 +202,7 @@ class ASoulLittleBun(QOpenGLWidget):
             'right_click': self.right_click_label
         }
         self.character_manager.load_character_images(labels_dict)
-    
+
     def create_custom_layers(self):
         """创建自定义图层，并按完整有序列表重排堆叠顺序"""
         all_layers = build_all_layers(self.character_manager.current_character,
@@ -228,11 +237,11 @@ class ASoulLittleBun(QOpenGLWidget):
                     label = QLabel(self)
                     label.hide()
                     self.custom_layers.append(label)
-    
+
     def calculate_layer_position(self, layer):
         """计算图层位置（考虑跟随设置）"""
         base_x, base_y = layer.x, layer.y
-        
+
         if layer.follow_type == "keyboard":
             # 跟随键盘位置 - 获取键盘当前的实际位置
             kb_geometry = self.keyboard_label.geometry()
@@ -248,7 +257,7 @@ class ASoulLittleBun(QOpenGLWidget):
         else:
             # 不跟随，使用绝对位置
             return base_x, base_y
-    
+
     def update_custom_layers_position(self):
         """更新自定义图层位置"""
         if not hasattr(self, 'custom_layers') or not self.custom_layers:
@@ -267,7 +276,7 @@ class ASoulLittleBun(QOpenGLWidget):
                 current = label.geometry()
                 if current.x() != x or current.y() != y:
                     label.setGeometry(x, y, layer.width, layer.height)
-    
+
     def open_custom_layer_manager(self):
         """打开图层管理对话框"""
         self.pause_input_monitoring()
@@ -279,8 +288,11 @@ class ASoulLittleBun(QOpenGLWidget):
                 settings=self.settings
             )
 
-            dialog.layers_changed.connect(lambda: self.on_custom_layers_preview(dialog))
+            dialog.layers_changed.connect(
+                lambda: self.on_custom_layers_preview(dialog))
             dialog.layers_applied.connect(self.on_custom_layers_applied)
+            dialog.keypress_preview_requested.connect(
+                self._on_keypress_preview_requested)
 
             dialog.exec()
             # All save/discard logic is handled via layers_applied signal in closeEvent
@@ -302,12 +314,24 @@ class ASoulLittleBun(QOpenGLWidget):
             self._rebuild_custom_layer_labels(dialog.all_layers)
             self._apply_default_layers_from_list(dialog.all_layers)
             self._restack_all_layers(dialog.all_layers)
+            # 如果正在显示按键预览，刷新预览文字以应用新的设置（如最大宽度、字体大小）
+            if self._is_keypress_preview_active:
+                self.keypress_display_label.setText(
+                    self._keypress_preview_text)
+                self._auto_fit_keypress_font(self._keypress_preview_text)
+                self.keypress_display_label.show()
             for k, v in orig.items():
                 self.settings.set(k, v)
         else:
             self._rebuild_custom_layer_labels(dialog.all_layers)
             self._apply_default_layers_from_list(dialog.all_layers)
             self._restack_all_layers(dialog.all_layers)
+            # 如果正在显示按键预览，刷新预览文字
+            if self._is_keypress_preview_active:
+                self.keypress_display_label.setText(
+                    self._keypress_preview_text)
+                self._auto_fit_keypress_font(self._keypress_preview_text)
+                self.keypress_display_label.show()
 
     def on_custom_layers_applied(self, ordered_layers):
         """应用/关闭回调"""
@@ -355,29 +379,29 @@ class ASoulLittleBun(QOpenGLWidget):
             'keyboard': self.keyboard_label,
             'mouse_click': self.mouse_label,
         }
-        
+
         # 按顺序提升图层，确保正确的堆叠顺序
         custom_layer_index = 0
         mouse_click_processed = False
         keypress_display_processed = False
-        
+
         for layer in all_layers:
             if isinstance(layer, DefaultLayer):
                 label = label_map.get(layer.layer_key)
                 if label:
                     label.raise_()
-                
+
                 # 当处理 mouse_click 图层时，同时处理相关的点击效果标签
                 if layer.layer_key == 'mouse_click':
                     self.left_click_label.raise_()
                     self.right_click_label.raise_()
                     mouse_click_processed = True
-                
+
                 # 当处理 keypress_display 图层时，处理按键显示标签
                 if layer.layer_key == 'keypress_display' and hasattr(self, 'keypress_display_label'):
                     self.keypress_display_label.raise_()
                     keypress_display_processed = True
-                    
+
             elif isinstance(layer, CustomLayer):
                 # 确保自定义图层按照 all_layers 中的顺序对应到 self.custom_layers
                 if custom_layer_index < len(self.custom_layers):
@@ -389,11 +413,11 @@ class ASoulLittleBun(QOpenGLWidget):
         if not mouse_click_processed:
             self.left_click_label.raise_()
             self.right_click_label.raise_()
-        
+
         # 如果 keypress_display 图层没有在图层列表中被处理，则默认将按键显示放在最上层
         if not keypress_display_processed and hasattr(self, 'keypress_display_label'):
             self.keypress_display_label.raise_()
-    
+
     def pause_input_monitoring(self):
         """暂停输入监听"""
         if hasattr(self, 'input_handler'):
@@ -402,13 +426,13 @@ class ASoulLittleBun(QOpenGLWidget):
             self.mouse_timer.stop()
         if hasattr(self, 'custom_layer_timer'):
             self.custom_layer_timer.stop()
-    
+
     def resume_input_monitoring(self):
         """恢复输入监听"""
         # 重新启动输入处理器的监听
         if hasattr(self, 'input_handler'):
             self.input_handler.start_listeners()
-        
+
         # 恢复定时器
         if hasattr(self, 'mouse_timer'):
             self.mouse_timer.start(16)  # 约60fps
@@ -422,16 +446,16 @@ class ASoulLittleBun(QOpenGLWidget):
             self.custom_layer_manager = CustomLayerManager(character_name)
             self.apply_settings()
             self.tray_manager.create_tray_menu()
-    
+
     # 输入处理回调
     def _handle_key_press(self, key_identifier):
         """处理按键按下"""
         self.key_press_signal.emit(key_identifier)
-    
+
     def _handle_key_release(self):
         """处理按键释放"""
         self.key_release_signal.emit()
-    
+
     def _handle_mouse_click(self, button, pressed):
         """处理鼠标点击"""
         if pressed:
@@ -441,47 +465,125 @@ class ASoulLittleBun(QOpenGLWidget):
                 self.show_right_click()
         else:
             self.hide_click_images()
-    
+
     def _on_key_press_signal(self, key_identifier):
         """键盘按下信号处理"""
-        self.input_handler.animate_key_press(self.keyboard_label, key_identifier)
+        self.input_handler.animate_key_press(
+            self.keyboard_label, key_identifier)
         # 显示按键
         if self.keypress_display_enabled:
             self._show_keypress_display(key_identifier)
         # 更新跟随键盘的自定义图层位置
         self.update_custom_layers_position()
-    
+
     def _on_key_release_signal(self):
         """键盘释放信号处理"""
         self.input_handler.animate_key_release(self.keyboard_label)
         # 更新跟随键盘的自定义图层位置
         self.update_custom_layers_position()
-    
+
     def _show_keypress_display(self, key_identifier):
         """显示按键"""
         if not key_identifier:
             return
-        
+
         # 格式化按键显示文本
         display_text = self._format_key_display(key_identifier)
-        
+
         self.keypress_display_label.setText(display_text)
-        
-        # 设置最小宽度以确保居中效果
-        min_width = 80
-        self.keypress_display_label.adjustSize()
-        if self.keypress_display_label.width() < min_width:
-            self.keypress_display_label.setFixedWidth(min_width)
-        
+
+        # 自动缩放字体以适应最大宽度
+        self._auto_fit_keypress_font(display_text)
+
         self.keypress_display_label.show()
-        
+
         # 重启定时器，1秒后隐藏
         self.keypress_display_timer.start(1000)
-    
+
+    def _auto_fit_keypress_font(self, text):
+        """自动调整字体大小，使按键文本适应最大宽度和用户设置的高度"""
+        from PyQt6.QtGui import QFontMetrics, QFont
+
+        base_font_size = self.settings.get('keypress_display_font_size', 16)
+        user_height = self.settings.get('keypress_display_height', 40)
+        # 使用用户设置的最大宽度，如果不设置则使用默认计算方式
+        user_max_width = self.settings.get('keypress_display_max_width', None)
+        if user_max_width and user_max_width > 0:
+            max_width = user_max_width
+        else:
+            # 最大宽度：窗口宽度减去显示位置的偏移，留出一定边距
+            max_width = self.window_width - \
+                self.settings.get('keypress_display_x', 10) - 10
+            # 最小不超过窗口宽度的80%
+            max_width = min(max_width, int(self.window_width * 0.85))
+        min_width = 80
+
+        # 从基础字号开始，逐步缩小直到文本能够适应最大宽度
+        font_size = base_font_size
+        min_font_size = 8  # 最小字号，防止过小无法阅读
+
+        label = self.keypress_display_label
+        font = label.font()
+
+        # 先计算基础字号下的文本宽度，如果不超过最大宽度就直接使用基础字号
+        font.setPointSize(base_font_size)
+        fm = QFontMetrics(font)
+        text_width = fm.horizontalAdvance(text)
+
+        # 只有当文本宽度超过最大宽度时，才需要缩小字体
+        if text_width > max_width:
+            while font_size >= min_font_size:
+                font.setPointSize(font_size)
+                fm = QFontMetrics(font)
+                text_width = fm.horizontalAdvance(text)
+                if text_width <= max_width:
+                    break
+                font_size -= 1
+
+        # 更新样式表中的字号（移除 padding，背景即标签大小）
+        if self.keypress_display_background:
+            style = (
+                f"color: white; "
+                f"background-color: rgba(0, 0, 0, 150); "
+                f"border-radius: 5px; "
+                f"font-size: {font_size}px; "
+                f"font-weight: bold;"
+            )
+        else:
+            style = (
+                f"color: white; "
+                f"font-size: {font_size}px; "
+                f"font-weight: bold;"
+            )
+        label.setStyleSheet(style)
+
+        # 调整标签尺寸：宽度根据文本自适应（但不超过最大宽度），高度使用用户设置值
+        font.setPointSize(font_size)
+        fm = QFontMetrics(font)
+        text_width = fm.horizontalAdvance(text)
+
+        actual_width = max(min_width, text_width)
+        # 使用用户设置的高度，文本会在标签内垂直居中（因为标签已设置 AlignCenter）
+        label.setFixedSize(actual_width, user_height)
+
     def _hide_keypress_display(self):
         """隐藏按键显示"""
         self.keypress_display_label.hide()
-    
+
+    def _on_keypress_preview_requested(self, show):
+        """图层管理对话框请求显示/隐藏按键预览"""
+        self._is_keypress_preview_active = show
+        if show:
+            # 停止自动隐藏定时器，保持持续显示
+            self.keypress_display_timer.stop()
+            # 显示示例文本（使用具有代表性的较长文字，便于定位）
+            self.keypress_display_label.setText(self._keypress_preview_text)
+            self._auto_fit_keypress_font(self._keypress_preview_text)
+            self.keypress_display_label.show()
+        else:
+            # 恢复隐藏（对话框关闭或选中其他图层）
+            self.keypress_display_label.hide()
+
     def _update_keypress_display_style(self):
         """更新按键显示样式"""
         if self.keypress_display_background:
@@ -501,7 +603,7 @@ class ASoulLittleBun(QOpenGLWidget):
                 f"font-weight: bold;"
             )
         self.keypress_display_label.setStyleSheet(style)
-    
+
     def _format_key_display(self, key_identifier):
         """格式化按键显示文本"""
         # 特殊按键映射
@@ -540,98 +642,122 @@ class ASoulLittleBun(QOpenGLWidget):
             'f5': 'F5', 'f6': 'F6', 'f7': 'F7', 'f8': 'F8',
             'f9': 'F9', 'f10': 'F10', 'f11': 'F11', 'f12': 'F12',
         }
-        
+
+        # 处理组合键（如 "Ctrl+c"、"Ctrl+Shift+s"）
+        if '+' in key_identifier:
+            parts = key_identifier.split('+')
+            formatted_parts = []
+            for part in parts:
+                # 修饰键部分已经是 "Ctrl"/"Shift"/"Alt"/"Win" 格式，直接使用
+                # 普通按键部分走普通映射
+                if part in ('Ctrl', 'Shift', 'Alt', 'AltGr', 'Win',
+                            'L-Ctrl', 'R-Ctrl', 'L-Shift', 'R-Shift',
+                            'L-Alt', 'R-Alt', 'L-Win', 'R-Win'):
+                    formatted_parts.append(part)
+                else:
+                    mapped = key_map.get(part.lower())
+                    if mapped:
+                        formatted_parts.append(mapped)
+                    elif len(part) == 1:
+                        formatted_parts.append(part.upper())
+                    else:
+                        formatted_parts.append(part.title())
+            return '+'.join(formatted_parts)
+
         return key_map.get(key_identifier, key_identifier.upper() if len(key_identifier) == 1 else key_identifier.title())
-    
+
     def show_left_click(self):
         """显示左键图片"""
         self.hide_click_images()
         if self.left_click_label.pixmap() and not self.left_click_label.pixmap().isNull():
             self.left_click_label.show()
-    
+
     def show_right_click(self):
         """显示右键图片"""
         self.hide_click_images()
         if self.right_click_label.pixmap() and not self.right_click_label.pixmap().isNull():
             self.right_click_label.show()
-    
+
     def hide_click_images(self):
         """隐藏所有鼠标按键图片"""
         self.left_click_label.hide()
         self.right_click_label.hide()
-    
+
     def _update_mouse_position(self):
         """更新鼠标位置"""
         self.mouse_tracker.update_mouse_position(
-            self.mouse_label, 
-            self.left_click_label, 
+            self.mouse_label,
+            self.left_click_label,
             self.right_click_label
         )
-    
+
     # 窗口管理相关方法
     def toggle_always_on_top(self):
         """切换窗口置顶状态"""
         self.window_manager.toggle_always_on_top()
         self.always_on_top = self.window_manager.always_on_top
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_mouse_passthrough(self):
         """切换鼠标穿透状态"""
         self.window_manager.toggle_mouse_passthrough()
         self.mouse_passthrough = self.window_manager.mouse_passthrough
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_hide_taskbar(self):
         """切换隐藏任务栏状态"""
         self.window_manager.toggle_hide_taskbar()
         self.hide_taskbar = self.window_manager.hide_taskbar
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_mouse_locked(self):
         """切换鼠标锁定状态"""
         self.window_manager.toggle_mouse_locked()
         self.mouse_locked = self.window_manager.mouse_locked
         self.mouse_tracker.set_locked(self.mouse_locked)
-        
+
         # 如果锁定鼠标，重置位置
         if self.mouse_locked:
             base_x = self.settings.get('mouse_x')
             base_y = self.settings.get('mouse_y')
             mouse_width = self.settings.get('mouse_width')
             mouse_height = self.settings.get('mouse_height')
-            self.mouse_label.setGeometry(base_x, base_y, mouse_width, mouse_height)
-            self.left_click_label.setGeometry(base_x, base_y, mouse_width, mouse_height)
-            self.right_click_label.setGeometry(base_x, base_y, mouse_width, mouse_height)
-        
+            self.mouse_label.setGeometry(
+                base_x, base_y, mouse_width, mouse_height)
+            self.left_click_label.setGeometry(
+                base_x, base_y, mouse_width, mouse_height)
+            self.right_click_label.setGeometry(
+                base_x, base_y, mouse_width, mouse_height)
+
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_keyboard_horizontal_offset(self):
         """切换键盘横向偏移状态"""
         self.window_manager.toggle_keyboard_horizontal_offset()
         self.keyboard_horizontal_offset = self.window_manager.keyboard_horizontal_offset
         self.input_handler.keyboard_horizontal_offset = self.keyboard_horizontal_offset
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_keypress_display(self):
         """切换按键显示状态"""
         self.window_manager.toggle_keypress_display()
         self.keypress_display_enabled = self.window_manager.keypress_display_enabled
-        
+
         # 如果禁用，立即隐藏当前显示的按键
         if not self.keypress_display_enabled:
             self.keypress_display_label.hide()
-        
+
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_keypress_display_background(self):
         """切换按键背景显示"""
         self.window_manager.toggle_keypress_display_background()
         self.keypress_display_background = self.window_manager.keypress_display_background
         self._update_keypress_display_style()
-        
+
         # 更新托盘菜单
         self.tray_manager.create_tray_menu()
-    
+
     def toggle_window_visibility(self):
         """切换窗口显示/隐藏状态"""
         if self.isVisible():
@@ -640,17 +766,17 @@ class ASoulLittleBun(QOpenGLWidget):
             self.show()
             self.raise_()
             self.activateWindow()
-    
+
     def quit_application(self):
         """退出应用程序"""
         self.close()
-    
+
     # 设置和关于
     def open_settings(self):
         """打开设置对话框"""
         # 暂停输入监听，避免在编辑时干扰
         self.pause_input_monitoring()
-        
+
         try:
             dialog = SettingsDialog(self.settings, self)
             if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -658,7 +784,7 @@ class ASoulLittleBun(QOpenGLWidget):
         finally:
             # 无论如何都要恢复输入监听
             self.resume_input_monitoring()
-    
+
     def show_about(self):
         """显示关于对话框"""
         version = self.get_version()
@@ -672,7 +798,7 @@ class ASoulLittleBun(QOpenGLWidget):
 <p>此工具为粉丝自发制作的非营利性第三方工具，与A-SOUL、枝江娱乐、乐华娱乐等官方无任何关联。</p>
 <p>成员Q版形象版权归原作者所有。如有侵权，请联系我们删除。</p>
         """
-        
+
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("关于")
         msg_box.setText(about_text)
@@ -680,9 +806,10 @@ class ASoulLittleBun(QOpenGLWidget):
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg_box.setIcon(QMessageBox.Icon.Information)
         msg_box.setMinimumWidth(400)
-        msg_box.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        msg_box.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextBrowserInteraction)
         msg_box.exec()
-    
+
     def apply_settings(self):
         """应用设置"""
         self.window_width = self.settings.get('window_width')
@@ -699,22 +826,22 @@ class ASoulLittleBun(QOpenGLWidget):
 
         self.load_character_images()
         self.create_custom_layers()
-    
+
     def _apply_geometry_from_settings(self):
         """仅更新各图层的几何尺寸（不保存、不重载图片），用于实时预览"""
         s = self.settings
         w = s.get('window_width')
         h = s.get('window_height')
         self.resize(w, h)
-        
+
         self.bg_label.setGeometry(0, 0, s.get('bg_width'), s.get('bg_height'))
-        
+
         kb_x = s.get('keyboard_x')
         kb_y = s.get('keyboard_y')
         kb_w = s.get('keyboard_width')
         kb_h = s.get('keyboard_height')
         self.keyboard_label.setGeometry(kb_x, kb_y, kb_w, kb_h)
-        
+
         mx = s.get('mouse_x')
         my = s.get('mouse_y')
         mw = s.get('mouse_width')
@@ -722,13 +849,13 @@ class ASoulLittleBun(QOpenGLWidget):
         self.mouse_label.setGeometry(mx, my, mw, mh)
         self.left_click_label.setGeometry(mx, my, mw, mh)
         self.right_click_label.setGeometry(mx, my, mw, mh)
-        
+
         self.keypress_display_label.setGeometry(
             s.get('keypress_display_x', 10),
             s.get('keypress_display_y', 10),
             100, 40
         )
-    
+
     def get_version(self):
         """从version.json文件读取版本号"""
         try:
@@ -738,7 +865,7 @@ class ASoulLittleBun(QOpenGLWidget):
                 return version_data.get('version', '1.0.0')
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
             return '1.0.0'
-    
+
     def check_for_updates(self):
         """检查更新"""
         try:
@@ -746,89 +873,91 @@ class ASoulLittleBun(QOpenGLWidget):
             checker.check_for_updates(self, self.global_settings)
         except Exception as e:
             print(f"检查更新失败: {e}")
-    
+
     # 鼠标事件处理
     def mousePressEvent(self, event):
         """鼠标按下事件 - 用于拖动窗口"""
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = True
-            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-    
+            self.drag_position = event.globalPosition().toPoint() - \
+                self.frameGeometry().topLeft()
+
     def mouseMoveEvent(self, event):
         """鼠标移动事件 - 拖动窗口"""
         if self.dragging:
             self.move(event.globalPosition().toPoint() - self.drag_position)
-    
+
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = False
-    
+
     def contextMenuEvent(self, event):
         """右键菜单"""
         menu = QMenu(self)
-        
+
         # 最小化到托盘
         minimize_action = QAction('最小化到托盘', self)
         minimize_action.triggered.connect(self.hide)
         menu.addAction(minimize_action)
-        
+
         menu.addSeparator()
-        
+
         # 窗口设置
         self._add_window_settings_menu(menu)
-        
+
         menu.addSeparator()
-        
+
         # 锁定鼠标和键盘偏移
         self._add_input_settings_menu(menu)
-        
+
         menu.addSeparator()
-        
+
         # 切换角色
         self._add_character_menu(menu)
-        
+
         # 自定义图层管理
         custom_layer_action = QAction('自定义图层管理', self)
         custom_layer_action.triggered.connect(self.open_custom_layer_manager)
         menu.addAction(custom_layer_action)
-        
+
         # 设置菜单
         settings_action = QAction('设置', self)
         settings_action.triggered.connect(self.open_settings)
         menu.addAction(settings_action)
-        
+
         menu.addSeparator()
-        
+
         # 退出菜单
         exit_action = QAction('退出', self)
         exit_action.triggered.connect(self.close)
         menu.addAction(exit_action)
-        
+
         menu.exec(event.globalPos())
-    
+
     def _add_window_settings_menu(self, parent_menu):
         """添加窗口设置子菜单"""
         window_settings_menu = parent_menu.addMenu('窗口设置')
-        
+
         always_on_top_action = QAction('窗口置顶', self)
         always_on_top_action.setCheckable(True)
         always_on_top_action.setChecked(self.always_on_top)
         always_on_top_action.triggered.connect(self.toggle_always_on_top)
         window_settings_menu.addAction(always_on_top_action)
-        
+
         mouse_passthrough_action = QAction('鼠标穿透', self)
         mouse_passthrough_action.setCheckable(True)
         mouse_passthrough_action.setChecked(self.mouse_passthrough)
-        mouse_passthrough_action.triggered.connect(self.toggle_mouse_passthrough)
+        mouse_passthrough_action.triggered.connect(
+            self.toggle_mouse_passthrough)
         window_settings_menu.addAction(mouse_passthrough_action)
-        
+
         hide_taskbar_action = QAction('隐藏任务栏 (OBS不可识别)', self)
         hide_taskbar_action.setCheckable(True)
         hide_taskbar_action.setChecked(self.hide_taskbar)
         hide_taskbar_action.triggered.connect(self.toggle_hide_taskbar)
         window_settings_menu.addAction(hide_taskbar_action)
-    
+
     def _add_input_settings_menu(self, parent_menu):
         """添加输入设置菜单项"""
         mouse_locked_action = QAction('锁定鼠标', self)
@@ -836,28 +965,31 @@ class ASoulLittleBun(QOpenGLWidget):
         mouse_locked_action.setChecked(self.mouse_locked)
         mouse_locked_action.triggered.connect(self.toggle_mouse_locked)
         parent_menu.addAction(mouse_locked_action)
-        
+
         keyboard_horizontal_offset_action = QAction('键盘横向偏移', self)
         keyboard_horizontal_offset_action.setCheckable(True)
-        keyboard_horizontal_offset_action.setChecked(self.keyboard_horizontal_offset)
-        keyboard_horizontal_offset_action.triggered.connect(self.toggle_keyboard_horizontal_offset)
+        keyboard_horizontal_offset_action.setChecked(
+            self.keyboard_horizontal_offset)
+        keyboard_horizontal_offset_action.triggered.connect(
+            self.toggle_keyboard_horizontal_offset)
         parent_menu.addAction(keyboard_horizontal_offset_action)
-        
+
         # 按键显示二级菜单
         keypress_menu = parent_menu.addMenu('按键显示')
-        
+
         keypress_display_action = QAction('启用按键显示', self)
         keypress_display_action.setCheckable(True)
         keypress_display_action.setChecked(self.keypress_display_enabled)
         keypress_display_action.triggered.connect(self.toggle_keypress_display)
         keypress_menu.addAction(keypress_display_action)
-        
+
         keypress_background_action = QAction('显示按键背景', self)
         keypress_background_action.setCheckable(True)
         keypress_background_action.setChecked(self.keypress_display_background)
-        keypress_background_action.triggered.connect(self.toggle_keypress_display_background)
+        keypress_background_action.triggered.connect(
+            self.toggle_keypress_display_background)
         keypress_menu.addAction(keypress_background_action)
-    
+
     def _add_character_menu(self, parent_menu):
         """添加角色切换子菜单"""
         if self.character_manager.characters:
@@ -868,31 +1000,32 @@ class ASoulLittleBun(QOpenGLWidget):
                     lambda checked, c=character: self.switch_to_character(c))
                 character_menu.addAction(char_action)
             parent_menu.addSeparator()
-    
+
     def closeEvent(self, event):
         """关闭事件"""
         # 保存窗口位置
         pos = self.pos()
         self.global_settings.set('window_x', pos.x())
         self.global_settings.set('window_y', pos.y())
-        self.global_settings.set('last_character', self.character_manager.current_character)
+        self.global_settings.set(
+            'last_character', self.character_manager.current_character)
         self.global_settings.save()
-        
+
         # 停止定时器
         if hasattr(self, 'mouse_timer'):
             self.mouse_timer.stop()
         if hasattr(self, 'custom_layer_timer'):
             self.custom_layer_timer.stop()
-        
+
         # 停止监听器
         self.input_handler.stop_listeners()
-        
+
         # 停止动画
         self.input_handler.stop_animation()
-        
+
         # 隐藏托盘图标
         self.tray_manager.hide()
-        
+
         event.accept()
         QApplication.quit()
 
@@ -900,7 +1033,7 @@ class ASoulLittleBun(QOpenGLWidget):
 if __name__ == '__main__':
     # 设置 OpenGL 渲染以支持 OBS 游戏捕获
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
-    
+
     # 配置 OpenGL 表面格式
     fmt = QSurfaceFormat()
     fmt.setVersion(3, 3)
@@ -908,7 +1041,7 @@ if __name__ == '__main__':
     fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
     fmt.setSamples(4)
     QSurfaceFormat.setDefaultFormat(fmt)
-    
+
     app = QApplication(sys.argv)
     pet = ASoulLittleBun()
     sys.exit(app.exec())

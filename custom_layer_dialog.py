@@ -20,6 +20,7 @@ class CustomLayerDialog(QDialog):
 
     layers_changed = pyqtSignal()   # 实时预览信号
     layers_applied = pyqtSignal(object)  # 最终保存信号，携带完整有序图层列表（或 None 表示不保存）
+    keypress_preview_requested = pyqtSignal(bool)  # 请求主窗口显示/隐藏按键预览（True=显示，False=隐藏）
 
     def __init__(self, layer_manager, parent=None, character_name=None, settings=None):
         super().__init__(parent)
@@ -332,6 +333,8 @@ class CustomLayerDialog(QDialog):
         self.keypress_x_slider, self.keypress_x_spin = self._make_slider_spin_row(keypress_form, 'X 偏移:', 0, sw, sv('keypress_display_x', 8))
         self.keypress_y_slider, self.keypress_y_spin = self._make_slider_spin_row(keypress_form, 'Y 偏移:', 0, sh, sv('keypress_display_y', 53))
         self.keypress_font_slider, self.keypress_font_spin = self._make_slider_spin_row(keypress_form, '字体大小:', 8, 48, sv('keypress_display_font_size', 20), suffix=' px')
+        self.keypress_max_width_slider, self.keypress_max_width_spin = self._make_slider_spin_row(keypress_form, '最大宽度:', 50, sw, sv('keypress_display_max_width', 200), suffix=' px')
+        self.keypress_height_slider, self.keypress_height_spin = self._make_slider_spin_row(keypress_form, '高度:', 20, sh, sv('keypress_display_height', 40), suffix=' px')
         extra_layout.addWidget(self.keypress_extra)
 
         parent_layout.addWidget(self.extra_group)
@@ -361,7 +364,7 @@ class CustomLayerDialog(QDialog):
                      self.kb_horizontal_spin, self.kb_width_spin, self.kb_height_spin,
                      self.mouse_x_spin, self.mouse_y_spin, self.max_offset_spin,
                      self.sensitivity_spin, self.return_speed_spin, self.mouse_width_spin, self.mouse_height_spin,
-                     self.keypress_x_spin, self.keypress_y_spin, self.keypress_font_spin]:
+                     self.keypress_x_spin, self.keypress_y_spin, self.keypress_font_spin, self.keypress_max_width_spin, self.keypress_height_spin]:
             spin.valueChanged.connect(self._on_extra_changed)
         self.sync_scale_check.stateChanged.connect(self._on_extra_changed)
         self.keypress_enabled_check.stateChanged.connect(self._on_extra_changed)
@@ -387,6 +390,8 @@ class CustomLayerDialog(QDialog):
         self.temp_settings['keypress_display_x'] = self.keypress_x_spin.value()
         self.temp_settings['keypress_display_y'] = self.keypress_y_spin.value()
         self.temp_settings['keypress_display_font_size'] = self.keypress_font_spin.value()
+        self.temp_settings['keypress_display_max_width'] = self.keypress_max_width_spin.value()
+        self.temp_settings['keypress_display_height'] = self.keypress_height_spin.value()
         max_w = max(self.bg_width_spin.value(),
                     self.kb_width_spin.value() + self.kb_x_spin.value(),
                     self.mouse_width_spin.value() + self.mouse_x_spin.value())
@@ -549,7 +554,7 @@ class CustomLayerDialog(QDialog):
             'mouse_x', 'mouse_y', 'mouse_width', 'mouse_height',
             'max_mouse_offset', 'mouse_sensitivity', 'mouse_return_speed', 'sync_scale_enabled',
             'keypress_display_enabled', 'keypress_display_x', 'keypress_display_y',
-            'keypress_display_font_size',
+            'keypress_display_font_size', 'keypress_display_max_width', 'keypress_display_height',
         ]
         for key in keys:
             if key in defaults:
@@ -612,14 +617,21 @@ class CustomLayerDialog(QDialog):
             self.connect_property_signals()
             if is_default:
                 self._show_extra_for_layer(self.current_layer.layer_key)
+                # 选中按键显示图层时，请求主窗口临时显示预览
+                self.keypress_preview_requested.emit(
+                    self.current_layer.layer_key == 'keypress_display'
+                )
             else:
                 self.extra_group.hide()
+                # 选中非按键显示图层时，取消预览
+                self.keypress_preview_requested.emit(False)
         else:
             self.current_index = -1
             self.current_layer = None
             self.set_properties_enabled(False)
             self.clear_layer_properties()
             self.extra_group.hide()
+            self.keypress_preview_requested.emit(False)
 
     def _get_default_layer_display_values(self, layer):
         ts = self.temp_settings
@@ -687,6 +699,8 @@ class CustomLayerDialog(QDialog):
                 (self.keypress_x_slider, self.keypress_x_spin, 'keypress_display_x', 8),
                 (self.keypress_y_slider, self.keypress_y_spin, 'keypress_display_y', 53),
                 (self.keypress_font_slider, self.keypress_font_spin, 'keypress_display_font_size', 20),
+                (self.keypress_max_width_slider, self.keypress_max_width_spin, 'keypress_display_max_width', 200),
+                (self.keypress_height_slider, self.keypress_height_spin, 'keypress_display_height', 40),
             ]:
                 slider.blockSignals(True); spin.blockSignals(True)
                 slider.setValue(sv(key, default)); spin.setValue(sv(key, default))
@@ -952,7 +966,7 @@ class CustomLayerDialog(QDialog):
                 'mouse_x', 'mouse_y', 'mouse_width', 'mouse_height',
                 'max_mouse_offset', 'mouse_sensitivity', 'mouse_return_speed', 'sync_scale_enabled',
                 'keypress_display_enabled', 'keypress_display_x', 'keypress_display_y',
-                'keypress_display_font_size',
+                'keypress_display_font_size', 'keypress_display_max_width', 'keypress_display_height',
             ]
             for key in keys_to_save:
                 if key in self.temp_settings:
@@ -973,6 +987,8 @@ class CustomLayerDialog(QDialog):
         return self._make_snapshot() != self._saved_snapshot
 
     def closeEvent(self, event):
+        # 关闭时确保取消按键预览
+        self.keypress_preview_requested.emit(False)
         if self.has_unsaved_changes():
             reply = QMessageBox.question(
                 self, "未保存的修改",
