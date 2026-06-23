@@ -2,7 +2,12 @@
 
 一个使用 PyQt6 制作的桌面宠物应用，类似 BongoCat，支持键盘动画和鼠标同步移动。
 
+![主图](image/image1.jpg)
+
 ## 功能特性
+
+![部分功能展示](image/image2.jpg)
+[预览视频](https://www.bilibili.com/video/BV1htc6zJEzb/)
 
 - 透明无边框窗口，置顶显示
 - 键盘按下时，键盘图片向下移动并回弹
