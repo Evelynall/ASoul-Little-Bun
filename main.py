@@ -1,6 +1,7 @@
 import sys
 import json
 import os
+import time
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QMenu, QDialog, QMessageBox
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
 from PyQt6.QtGui import QPainter, QAction, QIcon, QSurfaceFormat, QPixmap
@@ -56,6 +57,12 @@ class ASoulLittleBun(QOpenGLWidget):
         self.window_width = self.settings.get('window_width')
         self.window_height = self.settings.get('window_height')
 
+        # 加载累计运行时长
+        self._load_runtime_stats()
+        
+        # 记录本次启动时间
+        self.start_time = time.time()
+
         # 初始化系统托盘
         self.tray_manager = TrayManager(self)
         self.tray_manager.init_tray()
@@ -88,10 +95,74 @@ class ASoulLittleBun(QOpenGLWidget):
         self.custom_layer_timer.timeout.connect(
             self.update_custom_layers_position)
         self.custom_layer_timer.start(16)  # 约60fps，与鼠标同步
+        
+        # 陪伴时间定时器 - 每秒更新显示
+        self._companion_action = None
+        self.companion_timer = QTimer()
+        self.companion_timer.timeout.connect(self._update_companion_display)
+        self.companion_timer.start(1000)
+
+        # 关闭时保存统计
+        self.closeRequested = False
+        app.aboutToQuit.connect(self._save_runtime_stats)
 
         # 按键预览状态标志
         self._is_keypress_preview_active = False
         self._keypress_preview_text = "Ctrl"  # 预览时的示例文本
+
+    def _load_runtime_stats(self):
+        """加载累计运行时长"""
+        stats_file = path_manager.get_stats_file()
+        try:
+            if os.path.exists(stats_file):
+                with open(stats_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.total_runtime = data.get('total_runtime', 0)
+            else:
+                self.total_runtime = 0
+        except Exception as e:
+            print(f"加载运行时长失败: {e}")
+            self.total_runtime = 0
+
+    def _save_runtime_stats(self):
+        """保存累计运行时长"""
+        if hasattr(self, 'start_time') and hasattr(self, 'total_runtime'):
+            self.total_runtime += time.time() - self.start_time
+        stats_file = path_manager.get_stats_file()
+        try:
+            with open(stats_file, 'w', encoding='utf-8') as f:
+                json.dump({'total_runtime': getattr(self, 'total_runtime', 0)}, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"保存运行时长失败: {e}")
+
+    def get_companion_time_text(self):
+        """获取陪伴时间显示文本"""
+        if not hasattr(self, 'total_runtime'):
+            return "陪伴：0秒"
+        elapsed = self.total_runtime + (time.time() - self.start_time)
+        if elapsed < 60:
+            return f"陪伴：{int(elapsed)}秒"
+        elif elapsed < 3600:
+            minutes = int(elapsed // 60)
+            seconds = int(elapsed % 60)
+            return f"陪伴：{minutes}分{seconds}秒"
+        else:
+            hours = int(elapsed // 3600)
+            minutes = int((elapsed % 3600) // 60)
+            return f"陪伴：{hours}时{minutes}分"
+
+    def _update_companion_display(self):
+        """更新陪伴时间显示"""
+        if self._companion_action:
+            self._companion_action.setText(self.get_companion_time_text())
+
+    def add_companion_action_to_menu(self, menu):
+        """将陪伴时间菜单项添加到指定菜单"""
+        companion_label = QAction(self.get_companion_time_text(), self)
+        companion_label.setEnabled(False)
+        menu.addAction(companion_label)
+        self._companion_action = companion_label
+        return companion_label
 
     def init_ui(self):
         """初始化UI"""
@@ -896,6 +967,11 @@ class ASoulLittleBun(QOpenGLWidget):
         """右键菜单"""
         menu = QMenu(self)
 
+        # 陪伴时间
+        self.add_companion_action_to_menu(menu)
+        
+        menu.addSeparator()
+        
         # 最小化到托盘
         minimize_action = QAction('最小化到托盘', self)
         minimize_action.triggered.connect(self.hide)

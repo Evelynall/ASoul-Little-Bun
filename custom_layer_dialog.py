@@ -356,6 +356,11 @@ class CustomLayerDialog(QDialog):
         self.initial_mouse_y = sv('mouse_y', 90)
         self.initial_mouse_w = sv('mouse_width', 25)
         self.initial_mouse_h = sv('mouse_height', 25)
+        self.initial_keypress_x = sv('keypress_display_x', 8)
+        self.initial_keypress_y = sv('keypress_display_y', 53)
+        self.initial_keypress_font_size = sv('keypress_display_font_size', 20)
+        self.initial_keypress_max_width = sv('keypress_display_max_width', 200)
+        self.initial_keypress_height = sv('keypress_display_height', 40)
         self.initial_custom_layers = []
 
     def _connect_extra_signals(self):
@@ -431,6 +436,11 @@ class CustomLayerDialog(QDialog):
             self.initial_mouse_y = self.mouse_y_spin.value()
             self.initial_mouse_w = self.mouse_width_spin.value()
             self.initial_mouse_h = self.mouse_height_spin.value()
+            self.initial_keypress_x = self.keypress_x_spin.value()
+            self.initial_keypress_y = self.keypress_y_spin.value()
+            self.initial_keypress_font_size = self.keypress_font_spin.value()
+            self.initial_keypress_max_width = self.keypress_max_width_spin.value()
+            self.initial_keypress_height = self.keypress_height_spin.value()
             self.initial_custom_layers = [
                 {'x': l.x, 'y': l.y, 'width': l.width, 'height': l.height}
                 for l in self.all_layers if not self._is_default_layer(l)
@@ -502,6 +512,11 @@ class CustomLayerDialog(QDialog):
             (self.mouse_y_slider, self.mouse_y_spin, int(self.initial_mouse_y * sy)),
             (self.mouse_width_slider, self.mouse_width_spin, int(self.initial_mouse_w * sx)),
             (self.mouse_height_slider, self.mouse_height_spin, int(self.initial_mouse_h * sy)),
+            (self.keypress_x_slider, self.keypress_x_spin, int(self.initial_keypress_x * sx)),
+            (self.keypress_y_slider, self.keypress_y_spin, int(self.initial_keypress_y * sy)),
+            (self.keypress_font_slider, self.keypress_font_spin, int(self.initial_keypress_font_size * min(sx, sy))),
+            (self.keypress_max_width_slider, self.keypress_max_width_spin, int(self.initial_keypress_max_width * sx)),
+            (self.keypress_height_slider, self.keypress_height_spin, int(self.initial_keypress_height * sy)),
         ]:
             slider.blockSignals(True); spin.blockSignals(True)
             slider.setValue(val); spin.setValue(val)

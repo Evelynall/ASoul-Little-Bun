@@ -105,6 +105,10 @@ class PathManager:
         """获取程序根目录"""
         return self.base_dir
 
+    def get_stats_file(self):
+        """获取统计文件路径（累计运行时长等）"""
+        return self.get_path('stats.json')
+
 
 # 创建全局路径管理器实例
 path_manager = PathManager()

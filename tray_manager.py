@@ -54,6 +54,11 @@ class TrayManager:
         
         tray_menu = QMenu()
         
+        # 陪伴时间 - 使用主窗口的共享函数
+        self.parent.add_companion_action_to_menu(tray_menu)
+        
+        tray_menu.addSeparator()
+        
         # 显示/隐藏窗口
         show_action = QAction("显示/隐藏", self.parent)
         show_action.triggered.connect(self.parent.toggle_window_visibility)
